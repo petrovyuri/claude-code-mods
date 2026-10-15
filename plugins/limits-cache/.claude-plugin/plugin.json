@@ -1,0 +1,12 @@
+{
+  "name": "limits-cache",
+  "version": "0.0.1",
+  "description": "Полоса над полем ввода: лимиты аккаунта, обратный отсчёт кеша промпта и кнопки ↻ и «Авто», которые держат кеш тёплым скрытым форком сессии",
+  "author": {
+    "name": "Yuri Petrov",
+    "url": "https://github.com/petrovyuri"
+  },
+  "homepage": "https://petrovyuri.github.io/claude-code-mods/#limits-cache",
+  "repository": "https://github.com/petrovyuri/claude-code-mods",
+  "types": "./types/index.d.ts"
+}

@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Моды Claude Code</title>
+<meta name="description" content="Три мода для окна Claude Code: полоса лимитов над полем ввода, подсказка после ответа и вопрос перед опасной командой.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500&family=Golos+Text:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Только тёмная тема. Палитра по мотивам claude.com: тёплые серые, слоновая кость и акцент clay. */
+:root {
+  color-scheme: dark;
+  --bg: #141413;
+  --surface: #1a1918;
+  --raised: #262624;
+  --ink: #faf9f5;
+  --muted: #b0aea5;
+  --line: #30302e;
+  --accent: #d97757;
+  --accent-strong: #c6613f;
+  --limits: #9cc3b6;
+  --next: #aba6dd;
+  --panic: #e0705f;
+  --panic-soft: #2e1d19;
+  --on-color: #141413;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 17px/1.6 "Golos Text", system-ui, sans-serif;
+}
+a { color: inherit; text-underline-offset: 3px; }
+code { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 0.84em; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+.wrap { max-width: 1160px; margin: 0 auto; padding: 0 16px; }
+
+/* Шапка */
+.bar { display: flex; align-items: center; gap: 16px; padding: 20px 16px; }
+.bar a { color: var(--muted); text-decoration: none; font-size: 16px; }
+.bar a:hover { color: var(--ink); }
+
+.hero { padding: 72px 16px 96px; }
+.hero h1 {
+  margin: 0;
+  font: 400 clamp(40px, 6.6vw, 88px)/1.06 "Source Serif 4", Georgia, serif;
+  letter-spacing: -0.015em;
+  max-width: 16ch;
+}
+.hero .lead { max-width: 46ch; margin: 28px 0 0; font-size: 20px; line-height: 1.5; color: var(--muted); }
+.start { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; margin-top: 36px; }
+.start .cmd { flex: 0 1 560px; }
+.start .go-install {
+  display: inline-block; padding: 12px 20px; border-radius: 8px;
+  background: var(--accent-strong); color: #fff; text-decoration: none; font-weight: 500;
+}
+.start .go-install:hover { background: var(--accent); }
+
+/* Команда с кнопкой копирования */
+.cmd {
+  display: flex; align-items: stretch; min-width: 0;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--surface);
+  overflow: hidden;
+}
+.cmd code { flex: 1; min-width: 0; padding: 12px 14px; white-space: nowrap; overflow-x: auto; font-size: 14px; scrollbar-width: none; }
+.cmd button {
+  flex: none; border: 0; border-left: 1px solid var(--line); background: transparent;
+  padding: 0 16px; font-size: 14px; color: var(--muted); cursor: pointer;
+}
+.cmd button:hover { color: var(--ink); background: var(--raised); }
+
+/* Моды */
+.mod {
+  --tone: var(--ink);
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  gap: 48px 72px;
+  align-items: center;
+  padding: 88px 16px;
+  border-top: 1px solid var(--line);
+  scroll-margin-top: 16px;
+}
+#limits-cache { --tone: var(--limits); }
+/* Полоса limits-cache в окне идёт во всю ширину: демо под описанием. */
+.mod.wide { grid-template-columns: minmax(0, 1fr); gap: 40px; }
+
+#next-step { --tone: var(--next); }
+#panic-button { --tone: var(--panic); }
+.mod h2 {
+  margin: 0 0 6px;
+  font: 500 clamp(30px, 3.6vw, 44px)/1.1 "Source Serif 4", Georgia, serif;
+  letter-spacing: -0.01em;
+}
+.mod .where { margin: 0 0 22px; color: var(--tone); font-size: 16px; }
+.mod .say { margin: 0 0 18px; font-size: 20px; line-height: 1.5; max-width: 36ch; }
+.mod ul { margin: 0 0 28px; padding: 0; list-style: none; max-width: 46ch; }
+.mod li { position: relative; padding-left: 22px; margin-bottom: 8px; color: var(--muted); }
+.mod li::before { content: ""; position: absolute; left: 2px; top: 0.66em; width: 6px; height: 6px; border-radius: 50%; background: var(--tone); }
+.get { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.get .cmd { flex: 1 1 100%; }
+.zip {
+  flex: none; display: inline-block; padding: 11px 18px; border-radius: 8px;
+  background: var(--accent-strong); color: #fff; text-decoration: none; font-weight: 500; font-size: 15px;
+}
+.zip:hover { background: var(--accent); }
+.doc { color: var(--muted); font-size: 15px; padding: 0 4px; }
+.doc:hover { color: var(--ink); }
+.ver {
+  display: inline-block; vertical-align: middle; margin-left: 8px; padding: 3px 9px;
+  border: 1px solid var(--line); border-radius: 999px;
+  font: 500 13px/1.3 "JetBrains Mono", monospace; letter-spacing: 0; color: var(--muted);
+}
+
+/* Скриншоты модов в рамке */
+.shot {
+  margin: 0;
+  padding: 14px;
+  border: 1px solid transparent;
+  border-radius: 24px;
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    linear-gradient(140deg, var(--tone), var(--line) 38%, var(--line) 62%, var(--accent)) border-box;
+  box-shadow: 0 40px 90px -50px var(--tone);
+}
+.shot img { display: block; width: 100%; height: auto; border-radius: 12px; }
+.shot-stack { display: grid; gap: 14px; }
+.shot-stack img:first-child { justify-self: end; width: auto; max-width: 100%; }
+.shot figcaption { margin: 12px 4px 0; color: var(--muted); font-size: 14px; }
+
+/* panic-button: диалог чата как на скриншоте */
+.ask-dialog {
+  border: 1px solid #3a3a38; border-radius: 16px; overflow: hidden; background: #191918;
+  font: 400 19px/1.55 system-ui, "Segoe UI", sans-serif; color: #f2f1ec;
+}
+.ask-q { margin: 0; padding: 18px 22px; background: #212120; white-space: pre-line; }
+.ask-q .bang { color: #e5484d; margin-right: 6px; }
+.ask-opt { display: grid; grid-template-columns: 30px 1fr; align-items: start; gap: 4px 20px; padding: 22px 22px; border-top: 1px solid #2c2c2a; }
+.ask-opt:first-of-type { border-top: 0; }
+.ask-opt .radio { width: 30px; height: 30px; border-radius: 50%; border: 1.5px solid #5e5d59; box-sizing: border-box; }
+.ask-opt .radio.on { border: 0; background: radial-gradient(circle, #fff 0 4px, #2c84db 5px); }
+.ask-opt small { grid-column: 2; color: #a9a7a0; font-size: 19px; }
+.ask-actions { display: flex; justify-content: flex-end; gap: 14px; padding: 0 22px 20px; }
+.ask-actions span { border-radius: 8px; padding: 7px 14px; font-weight: 500; }
+.ask-skip { background: #2c2c2a; color: #e8e6dc; }
+.ask-send { display: inline-flex; align-items: center; gap: 10px; background: #fff; color: #141413; }
+.ask-send kbd { font: 500 15px/1 system-ui, sans-serif; border: 1px solid #c2c0b6; border-radius: 5px; padding: 3px 5px; }
+
+/* Установка */
+.install { padding: 88px 16px; border-top: 1px solid var(--line); }
+.install h2 { margin: 0 0 36px; font: 500 clamp(30px, 3.6vw, 44px)/1.1 "Source Serif 4", Georgia, serif; letter-spacing: -0.01em; }
+.steps { list-style: none; counter-reset: step; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; }
+.steps li { counter-increment: step; min-width: 0; }
+.steps li::before { content: counter(step); display: block; margin-bottom: 10px; font: 400 40px/1 "Source Serif 4", Georgia, serif; color: var(--muted); }
+.steps p { margin: 0 0 12px; }
+.other { max-width: 62ch; margin: 48px 0 0; color: var(--muted); }
+.other p { margin: 0 0 10px; }
+
+footer { padding: 32px 16px 56px; line-height: 1.7; border-top: 1px solid var(--line); color: var(--muted); font-size: 16px; }
+
+@media (max-width: 880px) {
+  .mod { grid-template-columns: minmax(0, 1fr); padding: 64px 16px; gap: 32px; }
+  .steps { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .hero { padding: 40px 16px 64px; }
+  .hero .lead { font-size: 19px; }
+}
+</style>
+</head>
+<body>
+
+<header class="wrap bar">
+  <a href="https://github.com/petrovyuri/claude-code-mods">petrovyuri/claude-code-mods</a>
+</header>
+
+<main>
+  <section class="wrap hero">
+    <h1><span>Лимиты,</span> <span>следующий шаг</span> <span>и&nbsp;стоп-кран</span></h1>
+    <p class="lead">Три мода для окна Claude Code: полоса лимитов над полем ввода, подсказка после ответа и вопрос перед опасной командой.</p>
+    <div class="start">
+      <div class="cmd"><code>claude plugin marketplace add petrovyuri/claude-code-mods</code><button type="button">Копировать</button></div>
+      <a class="go-install" href="#install">Как установить</a>
+    </div>
+  </section>
+
+  <article class="mod wide wrap" id="limits-cache" data-mod="limits-cache">
+    <div>
+      <h2>limits-cache <span class="ver">v0.0.1</span></h2>
+      <p class="where">Полоса над полем ввода</p>
+      <p class="say">Вы видите остаток лимитов и время до сброса кэша промпта.</p>
+      <ul>
+        <li>Лимиты аккаунта за пять часов и за семь дней: процент и время до сброса.</li>
+        <li>Полоса кеша зелёная, пока осталось больше половины, потом жёлтая и красная.</li>
+        <li>Кнопка ↻ прогревает кеш скрытым форком сессии, «Авто» делает это за три минуты до конца.</li>
+        <li>Закрытую полосу вы вернёте командой <code>/limits</code>.</li>
+      </ul>
+      <div class="get">
+        <div class="cmd"><code>claude plugin install limits-cache@petrovyuri-mods --scope user</code><button type="button">Копировать</button></div>
+        <a class="zip" href="downloads/limits-cache.zip" download>Скачать .zip</a>
+        <a class="doc" href="https://github.com/petrovyuri/claude-code-mods/tree/main/plugins/limits-cache#readme">README</a>
+        <a class="doc" href="https://github.com/petrovyuri/claude-code-mods/blob/main/plugins/limits-cache/CHANGELOG.md">Изменения</a>
+      </div>
+    </div>
+    <figure class="shot">
+      <img src="img/limits-cache.png" width="1021" height="295" alt="Полоса limits-cache над полем ввода: лимиты 5ч 6% и 7д 34%, кеш 1ч, кнопки прогрева и «Авто»">
+      <figcaption>Полоса над полем ввода в десктопе Claude Code.</figcaption>
+    </figure>
+  </article>
+
+  <article class="mod wrap" id="next-step" data-mod="next-step">
+    <div>
+      <h2>next-step <span class="ver">v0.0.1</span></h2>
+      <p class="where">Кнопка «Что дальше?» под ответом и панель</p>
+      <p class="say">После перерыва кнопка под ответом напомнит, на чём вы остановились и что написать дальше.</p>
+      <ul>
+        <li>Сессию читает дешёвая модель. Вы выбираете её в <code>/config</code>: <code>haiku</code> быстрее и дешевле, <code>sonnet</code> точнее.</li>
+        <li>В панели два раздела: «На чём остановились» и «Что дальше».</li>
+        <li>Ниже готовые сообщения карточками. Вы выбираете одно, и оно попадает в чат.</li>
+      </ul>
+      <div class="get">
+        <div class="cmd"><code>claude plugin install next-step@petrovyuri-mods --scope user</code><button type="button">Копировать</button></div>
+        <a class="zip" href="downloads/next-step.zip" download>Скачать .zip</a>
+        <a class="doc" href="https://github.com/petrovyuri/claude-code-mods/tree/main/plugins/next-step#readme">README</a>
+        <a class="doc" href="https://github.com/petrovyuri/claude-code-mods/blob/main/plugins/next-step/CHANGELOG.md">Изменения</a>
+      </div>
+    </div>
+    <figure class="shot shot-stack">
+      <img src="img/next-step-button.png" width="669" height="169" alt="Кнопка «Что дальше?» под последним ответом Claude">
+      <img src="img/next-step-pane.png" width="904" height="784" alt="Панель «Что дальше?»: на чём остановились, что дальше и карточки с готовыми сообщениями">
+      <figcaption>Кнопка под ответом и панель, которую она открывает.</figcaption>
+    </figure>
+  </article>
+
+  <article class="mod wide wrap" id="panic-button" data-mod="panic-button">
+    <div>
+      <h2>panic-button <span class="ver">v0.0.1</span></h2>
+      <p class="where">Вопрос в чате</p>
+      <p class="say">Перед командой, которую не отменить, Claude останавливается и спрашивает вас. Haiku одной фразой объясняет, что именно сломается.</p>
+      <ul>
+        <li>Файлы: <code>rm -rf</code>, <code>Remove-Item -Recurse</code>, <code>rmdir /s</code>.</li>
+        <li>Git: <code>push --force</code>, <code>reset --hard</code>, <code>clean -f</code>, <code>branch -D</code>.</li>
+        <li>Базы: <code>DROP TABLE</code>, <code>TRUNCATE</code>, <code>DELETE</code> без <code>WHERE</code>.</li>
+        <li>Секреты: чтение и правка файлов <code>.env</code>.</li>
+        <li>После «Запретить» Claude не повторяет команду, не ищет обходной путь и спрашивает, как быть.</li>
+        <li>Всю команду целиком видно в превью варианта, длинная цепочка ничего не спрячет.</li>
+      </ul>
+      <div class="get">
+        <div class="cmd"><code>claude plugin install panic-button@petrovyuri-mods --scope user</code><button type="button">Копировать</button></div>
+        <a class="zip" href="downloads/panic-button.zip" download>Скачать .zip</a>
+        <a class="doc" href="https://github.com/petrovyuri/claude-code-mods/tree/main/plugins/panic-button#readme">README</a>
+        <a class="doc" href="https://github.com/petrovyuri/claude-code-mods/blob/main/plugins/panic-button/CHANGELOG.md">Изменения</a>
+      </div>
+    </div>
+    <figure class="shot">
+      <div class="ask-dialog" role="img" aria-label="Вопрос panic-button в чате: опасное действие, команда и варианты Разрешить, Запретить, Другое">
+        <p class="ask-q"><span class="bang">❗</span>Опасное действие: удаление таблицы или базы данных.
+Команда только выводит текст "DROP TABLE demo" в консоль, таблица demo не удаляется.
+Команда: `echo "DROP TABLE demo"`
+Разрешить?</p>
+        <div class="ask-opt"><span class="radio on"></span><span>Разрешить</span></div>
+        <div class="ask-opt"><span class="radio"></span><span>Запретить</span><small>Claude не выполнит команду и спросит, как быть</small></div>
+        <div class="ask-opt"><span class="radio"></span><span>Другое</span></div>
+        <div class="ask-actions"><span class="ask-skip">Пропустить</span><span class="ask-send">Отправить <kbd>Ctrl</kbd><kbd>⏎</kbd></span></div>
+      </div>
+      <figcaption>Вопрос в чате перед опасной командой.</figcaption>
+    </figure>
+  </article>
+
+  <section class="wrap install" id="install">
+    <h2>Установка</h2>
+    <ol class="steps">
+      <li>
+        <p>Подключите marketplace один раз.</p>
+        <div class="cmd"><code>claude plugin marketplace add petrovyuri/claude-code-mods</code><button type="button">Копировать</button></div>
+      </li>
+      <li>
+        <p>Поставьте мод для всех проектов. Команду для каждого мода вы найдёте в его описании выше.</p>
+        <div class="cmd"><code>claude plugin install next-step@petrovyuri-mods --scope user</code><button type="button">Копировать</button></div>
+      </li>
+      <li>
+        <p>В открытой сессии выполните <code>/reload-plugins</code>. Новую сессию перезагружать не нужно.</p>
+      </li>
+    </ol>
+    <div class="other">
+      <p>Обновить мод: <code>claude plugin update &lt;мод&gt;@petrovyuri-mods</code>, затем <code>/reload-plugins</code>.</p>
+      <p>Без marketplace: скачайте архив мода и распакуйте его в папку <code>.claude/skills/</code> проекта. Claude Code загрузит мод при старте следующей сессии в этом проекте.</p>
+      <p>Все версии и изменения лежат в <a href="https://github.com/petrovyuri/claude-code-mods">репозитории</a>: у каждого мода свой README и CHANGELOG.</p>
+    </div>
+  </section>
+</main>
+
+<footer class="wrap">
+  Автор: <a href="https://github.com/petrovyuri">petrovyuri</a>. Исходники лежат в <a href="https://github.com/petrovyuri/claude-code-mods">репозитории на GitHub</a>, туда же пишите вопросы и предложения.<br>
+  Неофициальные моды, не связаны с Anthropic.
+</footer>
+
+<script>
+const $ = id => document.getElementById(id)
+
+// Копирование команд
+document.querySelectorAll('.cmd button').forEach(button => {
+  button.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(button.previousElementSibling.textContent)
+      button.textContent = 'Скопировано'
+    } catch {
+      button.textContent = 'Выделите вручную'
+    }
+    setTimeout(() => { button.textContent = 'Копировать' }, 1800)
+  })
+})
+
+</script>
+</body>
+</html>

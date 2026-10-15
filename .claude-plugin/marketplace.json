@@ -1,0 +1,31 @@
+{
+  "name": "petrovyuri-mods",
+  "owner": {
+    "name": "Yuri Petrov",
+    "url": "https://github.com/petrovyuri"
+  },
+  "metadata": {
+    "description": "Моды для Claude Code: полоса лимитов, подсказка следующего шага и тревожная кнопка",
+    "version": "0.0.1"
+  },
+  "plugins": [
+    {
+      "name": "limits-cache",
+      "source": "./plugins/limits-cache",
+      "version": "0.0.1",
+      "description": "Полоса над полем ввода: лимиты аккаунта, обратный отсчёт кеша промпта и кнопки ↻ и «Авто», которые держат кеш тёплым скрытым форком сессии"
+    },
+    {
+      "name": "next-step",
+      "source": "./plugins/next-step",
+      "version": "0.0.1",
+      "description": "Кнопка «Что дальше?» под последним ответом: дешёвая модель читает сессию, пишет, на чём остановились и что дальше, и предлагает готовые сообщения"
+    },
+    {
+      "name": "panic-button",
+      "source": "./plugins/panic-button",
+      "version": "0.0.1",
+      "description": "Тревожная кнопка: перед опасной командой (rm -rf, git push --force, DROP TABLE, .env) Haiku коротко объясняет, что сломается, и спрашивает «Разрешить / Запретить»"
+    }
+  ]
+}

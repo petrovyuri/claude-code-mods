@@ -1,0 +1,4 @@
+# Типы claude-code, которые генерирует `claude plugin test`
+plugins/*/.claude-plugin/types/
+node_modules/
+_site/

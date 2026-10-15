@@ -1,0 +1,24 @@
+{
+  "name": "next-step",
+  "version": "0.0.1",
+  "description": "Кнопка «Что дальше?» под последним ответом: дешёвая модель читает сессию, пишет, на чём остановились и что дальше, и предлагает готовые сообщения",
+  "author": {
+    "name": "Yuri Petrov",
+    "url": "https://github.com/petrovyuri"
+  },
+  "homepage": "https://petrovyuri.github.io/claude-code-mods/#next-step",
+  "repository": "https://github.com/petrovyuri/claude-code-mods",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "model": {
+      "type": "string",
+      "title": "Модель для сводки",
+      "description": "Кто читает сессию: haiku дешевле и быстрее, sonnet точнее",
+      "default": "haiku",
+      "options": [
+        "haiku",
+        "sonnet"
+      ]
+    }
+  }
+}

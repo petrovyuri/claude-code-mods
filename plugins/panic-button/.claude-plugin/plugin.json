@@ -1,0 +1,11 @@
+{
+  "name": "panic-button",
+  "version": "0.0.1",
+  "description": "Тревожная кнопка: перед опасной командой (rm -rf, git push --force, DROP TABLE, .env) Haiku коротко объясняет, что сломается, и спрашивает «Разрешить / Запретить»",
+  "author": {
+    "name": "Yuri Petrov",
+    "url": "https://github.com/petrovyuri"
+  },
+  "homepage": "https://petrovyuri.github.io/claude-code-mods/#panic-button",
+  "repository": "https://github.com/petrovyuri/claude-code-mods"
+}
