@@ -1,6 +1,6 @@
 # Моды для Claude Code
 
-![версия](https://img.shields.io/badge/версия-0.0.1-c6613f) ![моды](https://img.shields.io/badge/моды-3-30302e)
+![версия](https://img.shields.io/badge/версия-0.0.1-c6613f) ![моды](https://img.shields.io/badge/моды-3-30302e) ![лицензия](https://img.shields.io/badge/лицензия-MIT-30302e)
 
 Три мода, которые встраиваются в окно Claude Code: полоса лимитов над полем ввода, подсказка после ответа и вопрос перед опасной командой.
 
@@ -72,6 +72,10 @@ claude plugin test plugins/next-step
 ```bash
 node --test docs/site.test.mjs
 ```
+
+## Лицензия
+
+[MIT](LICENSE): моды можно свободно использовать, менять и распространять, если сохранить уведомление об авторских правах.
 
 ## Отказ от ответственности
 

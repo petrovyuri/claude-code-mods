@@ -33,6 +33,7 @@ jobs:
           rm -f _site/*.test.mjs
           for mod in $(node -p "require('./.claude-plugin/marketplace.json').plugins.map(p => p.name).join(' ')"); do
             (cd plugins && zip -qr "../_site/downloads/$mod.zip" "$mod" -x "$mod/tests/*")
+            zip -qj "_site/downloads/$mod.zip" LICENSE
           done
           ls -la _site/downloads
       - uses: actions/configure-pages@v5

@@ -7,5 +7,6 @@
     "url": "https://github.com/petrovyuri"
   },
   "homepage": "https://petrovyuri.github.io/claude-code-mods/#panic-button",
-  "repository": "https://github.com/petrovyuri/claude-code-mods"
+  "repository": "https://github.com/petrovyuri/claude-code-mods",
+  "license": "MIT"
 }

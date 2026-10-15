@@ -8,6 +8,7 @@
   },
   "homepage": "https://petrovyuri.github.io/claude-code-mods/#next-step",
   "repository": "https://github.com/petrovyuri/claude-code-mods",
+  "license": "MIT",
   "types": "./types/index.d.ts",
   "userConfig": {
     "model": {

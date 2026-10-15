@@ -78,3 +78,11 @@ test('команды переносятся, а не обрезаются', () =
   assert.ok(rule.includes('white-space: pre-wrap'), rule)
   assert.ok(!rule.includes('nowrap'), rule)
 })
+
+test('лицензия MIT в корне и у каждого мода', () => {
+  assert.match(readFileSync(new URL('LICENSE', root), 'utf8'), /^MIT License/)
+  for (const plugin of marketplace.plugins) {
+    const manifest = JSON.parse(readFileSync(new URL(`${plugin.source.replace('./', '')}/.claude-plugin/plugin.json`, root), 'utf8'))
+    assert.equal(manifest.license, 'MIT', plugin.name)
+  }
+})

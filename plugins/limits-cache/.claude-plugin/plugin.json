@@ -8,5 +8,6 @@
   },
   "homepage": "https://petrovyuri.github.io/claude-code-mods/#limits-cache",
   "repository": "https://github.com/petrovyuri/claude-code-mods",
+  "license": "MIT",
   "types": "./types/index.d.ts"
 }
