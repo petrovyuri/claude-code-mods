@@ -86,3 +86,9 @@ test('лицензия MIT в корне и у каждого мода', () => {
     assert.equal(manifest.license, 'MIT', plugin.name)
   }
 })
+
+test('в шапке логотип GitHub со ссылкой на репозиторий', () => {
+  const header = html.match(/<header class="wrap bar">[\s\S]*?<\/header>/)?.[0] ?? ''
+  assert.match(header, /<a class="gh" href="https:\/\/github\.com\/petrovyuri\/claude-code-mods"/)
+  assert.ok(header.includes('<svg'), 'логотип')
+})
