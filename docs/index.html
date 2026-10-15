@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Моды Claude Code</title>
+<title>Моды для Claude Code</title>
 <meta name="description" content="Три мода для окна Claude Code: полоса лимитов над полем ввода, подсказка после ответа и вопрос перед опасной командой.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%23141413%22/%3E%3Cpath d=%22M9 11l6 5-6 5M17 22h7%22 stroke=%22%23d97757%22 stroke-width=%223%22 fill=%22none%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -57,7 +57,8 @@ button { font: inherit; color: inherit; }
 }
 .hero .lead { max-width: 46ch; margin: 28px 0 0; font-size: 20px; line-height: 1.5; color: var(--muted); }
 .start { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; margin-top: 36px; }
-.start .cmd { flex: 0 1 560px; }
+.start { max-width: 760px; }
+.start .cmd { flex: 1 1 100%; }
 .start .go-install {
   display: inline-block; padding: 12px 20px; border-radius: 8px;
   background: var(--accent-strong); color: #fff; text-decoration: none; font-weight: 500;
@@ -70,7 +71,7 @@ button { font: inherit; color: inherit; }
   border: 1px solid var(--line); border-radius: 8px; background: var(--surface);
   overflow: hidden;
 }
-.cmd code { flex: 1; min-width: 0; padding: 12px 14px; white-space: nowrap; overflow-x: auto; font-size: 14px; scrollbar-width: none; }
+.cmd code { flex: 1; min-width: 0; padding: 12px 14px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
 .cmd button {
   flex: none; border: 0; border-left: 1px solid var(--line); background: transparent;
   padding: 0 16px; font-size: 14px; color: var(--muted); cursor: pointer;
@@ -104,6 +105,15 @@ button { font: inherit; color: inherit; }
 .mod ul { margin: 0 0 28px; padding: 0; list-style: none; max-width: 46ch; }
 .mod li { position: relative; padding-left: 22px; margin-bottom: 8px; color: var(--muted); }
 .mod li::before { content: ""; position: absolute; left: 2px; top: 0.66em; width: 6px; height: 6px; border-radius: 50%; background: var(--tone); }
+.why { max-width: 760px; margin: 8px 0 32px; padding: 24px 26px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+.why h3 { margin: 0 0 12px; font: 500 24px/1.2 "Source Serif 4", Georgia, serif; }
+.why p { margin: 0 0 12px; color: var(--muted); }
+.why .note { margin: 16px 0 0; font-size: 15px; }
+.cost { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
+.cost div { padding: 14px 16px; border-radius: 12px; background: var(--raised); }
+.cost-n { display: block; font: 400 40px/1.1 "Source Serif 4", Georgia, serif; color: var(--limits); }
+.cost-n.bad { color: var(--panic); }
+.cost-l { display: block; margin-top: 4px; font-size: 14px; color: var(--muted); }
 .get { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .get .cmd { flex: 1 1 100%; }
 .zip {
@@ -156,18 +166,20 @@ button { font: inherit; color: inherit; }
 /* Установка */
 .install { padding: 88px 16px; border-top: 1px solid var(--line); }
 .install h2 { margin: 0 0 36px; font: 500 clamp(30px, 3.6vw, 44px)/1.1 "Source Serif 4", Georgia, serif; letter-spacing: -0.01em; }
-.steps { list-style: none; counter-reset: step; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; }
-.steps li { counter-increment: step; min-width: 0; }
-.steps li::before { content: counter(step); display: block; margin-bottom: 10px; font: 400 40px/1 "Source Serif 4", Georgia, serif; color: var(--muted); }
+.steps { list-style: none; counter-reset: step; margin: 0; padding: 0; display: grid; gap: 28px; max-width: 760px; }
+.steps li { counter-increment: step; min-width: 0; display: grid; grid-template-columns: 48px minmax(0, 1fr); column-gap: 16px; }
+.steps li::before { content: counter(step); display: block; grid-row: span 2; font: 400 40px/1 "Source Serif 4", Georgia, serif; color: var(--muted); }
 .steps p { margin: 0 0 12px; }
-.other { max-width: 62ch; margin: 48px 0 0; color: var(--muted); }
+.other { max-width: 760px; margin: 48px 0 0; color: var(--muted); }
+.other .cmd { margin: 4px 0 18px; }
 .other p { margin: 0 0 10px; }
 
 footer { padding: 32px 16px 56px; line-height: 1.7; border-top: 1px solid var(--line); color: var(--muted); font-size: 16px; }
 
 @media (max-width: 880px) {
   .mod { grid-template-columns: minmax(0, 1fr); padding: 64px 16px; gap: 32px; }
-  .steps { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .cost { grid-template-columns: minmax(0, 1fr); }
+  .why { padding: 20px; }
   .hero { padding: 40px 16px 64px; }
   .hero .lead { font-size: 19px; }
 }
@@ -181,7 +193,7 @@ footer { padding: 32px 16px 56px; line-height: 1.7; border-top: 1px solid var(--
 
 <main>
   <section class="wrap hero">
-    <h1><span>Лимиты,</span> <span>следующий шаг</span> <span>и&nbsp;стоп-кран</span></h1>
+    <h1>Моды для Claude&nbsp;Code</h1>
     <p class="lead">Три мода для окна Claude Code: полоса лимитов над полем ввода, подсказка после ответа и вопрос перед опасной командой.</p>
     <div class="start">
       <div class="cmd"><code>claude plugin marketplace add petrovyuri/claude-code-mods</code><button type="button">Копировать</button></div>
@@ -200,6 +212,16 @@ footer { padding: 32px 16px 56px; line-height: 1.7; border-top: 1px solid var(--
         <li>Кнопка ↻ прогревает кеш скрытым форком сессии, «Авто» делает это за три минуты до конца.</li>
         <li>Закрытую полосу вы вернёте командой <code>/limits</code>.</li>
       </ul>
+      <div class="why">
+        <h3>Зачем прогревать кеш</h3>
+        <p>Claude Code хранит контекст сессии в кеше промпта. Пока кеш жив, каждый запрос читает контекст за 10% цены входа и продлевает кешу жизнь. Если вы ушли дольше, чем живёт кеш, следующее сообщение записывает весь контекст заново: за 125% цены у 5-минутного кеша и за 200% у часового.</p>
+        <p>Прогрев — короткий запрос, который только читает кеш, и отсчёт начинается заново. Ответ после паузы к тому же приходит быстрее: контекст не нужно обрабатывать заново.</p>
+        <div class="cost">
+          <div><span class="cost-n">×0,1</span><span class="cost-l">прогрев: чтение контекста из кеша</span></div>
+          <div><span class="cost-n bad">×2</span><span class="cost-l">остывший часовой кеш: запись всего контекста заново</span></div>
+        </div>
+        <p class="note">Пример: в сессии 200 тысяч токенов контекста. Прогрев стоит как 20 тысяч токенов входа, перезапись часового кеша как 400 тысяч, в 20 раз дороже. Множители взяты из тарифов API Anthropic. Если вы не пишете час, «Авто» выключается: держать кеш дальше нет смысла.</p>
+      </div>
       <div class="get">
         <div class="cmd"><code>claude plugin install limits-cache@petrovyuri-mods --scope user</code><button type="button">Копировать</button></div>
         <a class="zip" href="downloads/limits-cache.zip" download>Скачать .zip</a>
@@ -288,7 +310,8 @@ footer { padding: 32px 16px 56px; line-height: 1.7; border-top: 1px solid var(--
       </li>
     </ol>
     <div class="other">
-      <p>Обновить мод: <code>claude plugin update &lt;мод&gt;@petrovyuri-mods</code>, затем <code>/reload-plugins</code>.</p>
+      <p>Обновить мод до новой версии, затем выполнить <code>/reload-plugins</code>:</p>
+      <div class="cmd"><code>claude plugin update next-step@petrovyuri-mods</code><button type="button">Копировать</button></div>
       <p>Без marketplace: скачайте архив мода и распакуйте его в папку <code>.claude/skills/</code> проекта. Claude Code загрузит мод при старте следующей сессии в этом проекте.</p>
       <p>Все версии и изменения лежат в <a href="https://github.com/petrovyuri/claude-code-mods">репозитории</a>: у каждого мода свой README и CHANGELOG.</p>
     </div>

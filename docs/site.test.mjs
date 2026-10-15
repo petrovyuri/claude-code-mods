@@ -66,3 +66,14 @@ test('картинки на странице лежат в docs/', () => {
     assert.ok(existsSync(new URL(`docs/${src}`, root)), src)
   }
 })
+
+test('заголовок страницы — «Моды для Claude Code»', () => {
+  assert.match(html, /<title>Моды для Claude Code<\/title>/)
+  assert.match(html, /<h1>Моды для Claude&nbsp;Code<\/h1>/)
+})
+
+test('команды переносятся, а не обрезаются', () => {
+  const rule = html.match(/\.cmd code \{[^}]*\}/)?.[0] ?? ''
+  assert.ok(rule.includes('white-space: pre-wrap'), rule)
+  assert.ok(!rule.includes('nowrap'), rule)
+})
