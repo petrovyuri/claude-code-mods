@@ -1,8 +1,8 @@
 # Моды для Claude Code
 
-![версия](https://img.shields.io/badge/версия-0.0.1-c6613f) ![моды](https://img.shields.io/badge/моды-3-30302e) ![лицензия](https://img.shields.io/badge/лицензия-MIT-30302e)
+![версия](https://img.shields.io/badge/версия-0.0.1-c6613f) ![моды](https://img.shields.io/badge/моды-4-30302e) ![лицензия](https://img.shields.io/badge/лицензия-MIT-30302e)
 
-Три мода, которые встраиваются в окно Claude Code: полоса лимитов над полем ввода, подсказка после ответа и вопрос перед опасной командой.
+Четыре мода, которые встраиваются в окно Claude Code: полоса лимитов над полем ввода, подсказка после ответа, вопрос перед опасной командой и панель Docker.
 
 **Сайт со скриншотами и архивами:** https://petrovyuri.github.io/claude-code-mods/
 
@@ -12,6 +12,7 @@
 
 | Мод | Версия | Что делает |
 |---|---|---|
+| [docker-manager](plugins/docker-manager#readme) | 0.0.1 | Панель Docker по команде `/docker`, как в VS Code: compose-проекты и контейнеры со стартом, остановкой, логами и удалением, образы, сети и тома |
 | [limits-cache](plugins/limits-cache#readme) | 0.0.1 | Полоса над полем ввода: лимиты за 5 часов и 7 дней, время жизни кеша промпта, прогрев кеша кнопкой ↻ или сам в режиме «Авто» |
 | [next-step](plugins/next-step#readme) | 0.0.1 | Кнопка «Что дальше?» под ответом: на чём остановились, что дальше и готовые сообщения на выбор |
 | [panic-button](plugins/panic-button#readme) | 0.0.1 | Перед `rm -rf`, `git push --force`, `DROP TABLE` и доступом к `.env` спрашивает «Разрешить / Запретить» и объясняет, что сломается |
@@ -25,6 +26,10 @@ claude plugin marketplace add petrovyuri/claude-code-mods
 ```
 
 Поставьте нужный мод для всех проектов:
+
+```bash
+claude plugin install docker-manager@petrovyuri-mods --scope user
+```
 
 ```bash
 claude plugin install limits-cache@petrovyuri-mods --scope user

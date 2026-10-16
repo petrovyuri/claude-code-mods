@@ -1,0 +1,13 @@
+{
+  "name": "docker-manager",
+  "version": "0.0.1",
+  "description": "Панель Docker по образцу плагина VS Code: compose-проекты и контейнеры со стартом, остановкой, логами и удалением, образы, сети и тома",
+  "author": {
+    "name": "Yuri Petrov",
+    "url": "https://github.com/petrovyuri"
+  },
+  "homepage": "https://petrovyuri.github.io/claude-code-mods/#docker-manager",
+  "repository": "https://github.com/petrovyuri/claude-code-mods",
+  "license": "MIT",
+  "types": "./types/index.d.ts"
+}

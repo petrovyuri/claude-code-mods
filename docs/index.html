@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Моды для Claude Code</title>
-<meta name="description" content="Три мода для окна Claude Code: полоса лимитов над полем ввода, подсказка после ответа и вопрос перед опасной командой.">
+<meta name="description" content="Четыре мода для окна Claude Code: полоса лимитов над полем ввода, подсказка после ответа, вопрос перед опасной командой и панель Docker.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%23141413%22/%3E%3Cpath d=%22M9 11l6 5-6 5M17 22h7%22 stroke=%22%23d97757%22 stroke-width=%223%22 fill=%22none%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -25,6 +25,7 @@
   --next: #aba6dd;
   --panic: #e0705f;
   --panic-soft: #2e1d19;
+  --docker: #7ab8ec;
   --on-color: #141413;
 }
 
@@ -96,6 +97,7 @@ button { font: inherit; color: inherit; }
 
 #next-step { --tone: var(--next); }
 #panic-button { --tone: var(--panic); }
+#docker-manager { --tone: var(--docker); }
 .mod h2 {
   margin: 0 0 6px;
   font: 500 clamp(30px, 3.6vw, 44px)/1.1 "Source Serif 4", Georgia, serif;
@@ -164,6 +166,30 @@ button { font: inherit; color: inherit; }
 .ask-send { display: inline-flex; align-items: center; gap: 10px; background: #fff; color: #141413; }
 .ask-send kbd { font: 500 15px/1 system-ui, sans-serif; border: 1px solid #c2c0b6; border-radius: 5px; padding: 3px 5px; }
 
+/* docker-manager: панель как в десктопе */
+.dk-pane {
+  border: 1px solid #3a3a38; border-radius: 16px; background: #191918; padding: 16px 18px 20px;
+  font: 400 15px/1.4 system-ui, "Segoe UI", sans-serif; color: #f2f1ec;
+}
+.dk-title { margin: 0 0 14px; font-size: 16px; color: #d6d4cc; }
+.dk-tabs { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+.dk-tabs .refresh { margin-left: auto; }
+.dk-btn { display: inline-block; padding: 5px 11px; border-radius: 7px; background: #2c2c2a; color: #d6d4cc; white-space: nowrap; }
+.dk-btn.on { background: #fff; color: #141413; }
+.dk-list { border: 1px solid #3a3a38; border-radius: 12px; padding: 10px 12px; display: grid; gap: 10px; }
+.dk-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
+.dk-row > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dk-acts { display: flex; gap: 6px; flex: none; }
+.dk-n { color: #8a8880; margin-left: 8px; }
+.dk-n.up { color: #4caf50; }
+.dk-c { padding-left: 22px; color: #a9a7a0; }
+.dk-c b { color: #f2f1ec; font-weight: 400; margin-right: 8px; }
+.dk-c .dot { color: #4caf50; margin-right: 8px; }
+.dk-c a { color: #6aa7e6; margin-left: 8px; text-decoration: none; }
+.dk-sub { padding-left: 22px; display: flex; flex-wrap: wrap; gap: 6px; }
+/* На телефоне кнопки проекта уходят под имя, а не съедают его. */
+@media (max-width: 480px) { .dk-row { flex-wrap: wrap; } }
+
 /* Установка */
 .install { padding: 88px 16px; border-top: 1px solid var(--line); }
 .install h2 { margin: 0 0 36px; font: 500 clamp(30px, 3.6vw, 44px)/1.1 "Source Serif 4", Georgia, serif; letter-spacing: -0.01em; }
@@ -200,7 +226,7 @@ footer { padding: 32px 16px 56px; line-height: 1.7; border-top: 1px solid var(--
 <main>
   <section class="wrap hero">
     <h1>Моды для Claude&nbsp;Code</h1>
-    <p class="lead">Три мода для окна Claude Code: полоса лимитов над полем ввода, подсказка после ответа и вопрос перед опасной командой.</p>
+    <p class="lead">Четыре мода для окна Claude Code: полоса лимитов над полем ввода, подсказка после ответа, вопрос перед опасной командой и панель Docker.</p>
     <div class="start">
       <div class="cmd"><code>claude plugin marketplace add petrovyuri/claude-code-mods</code><button type="button">Копировать</button></div>
       <a class="go-install" href="#install">Как установить</a>
@@ -297,6 +323,43 @@ footer { padding: 32px 16px 56px; line-height: 1.7; border-top: 1px solid var(--
         <div class="ask-actions"><span class="ask-skip">Пропустить</span><span class="ask-send">Отправить <kbd>Ctrl</kbd><kbd>⏎</kbd></span></div>
       </div>
       <figcaption>Вопрос в чате перед опасной командой.</figcaption>
+    </figure>
+  </article>
+
+  <article class="mod wrap" id="docker-manager" data-mod="docker-manager">
+    <div>
+      <h2>docker-manager <span class="ver">v0.0.1</span></h2>
+      <p class="where">Панель по команде <code>/docker</code></p>
+      <p class="say">Контейнеры под рукой, как в плагине Docker для VS Code. Управляете вы сами, кнопками, без запросов к Claude.</p>
+      <ul>
+        <li>Compose-проекты деревом и отдельные контейнеры, у группы счётчик «запущено / всего».</li>
+        <li>Старт, стоп, рестарт, логи и удаление контейнера; у проекта старт, стоп, рестарт и <code>compose down</code>.</li>
+        <li>Опубликованные порты ссылками на <code>localhost</code>.</li>
+        <li>Вкладки «Образы», «Сети» и «Тома»: удаление и очистка неиспользуемого.</li>
+        <li>Удаление спрашивает второй раз, результат пропадает сам через несколько секунд.</li>
+      </ul>
+      <div class="get">
+        <div class="cmd"><code>claude plugin install docker-manager@petrovyuri-mods --scope user</code><button type="button">Копировать</button></div>
+        <a class="zip" href="downloads/docker-manager.zip" download>Скачать .zip</a>
+        <a class="doc" href="https://github.com/petrovyuri/claude-code-mods/tree/main/plugins/docker-manager#readme">README</a>
+        <a class="doc" href="https://github.com/petrovyuri/claude-code-mods/blob/main/plugins/docker-manager/CHANGELOG.md">Изменения</a>
+      </div>
+    </div>
+    <figure class="shot">
+      <div class="dk-pane" role="img" aria-label="Панель Docker: вкладки контейнеров, образов, сетей и томов, compose-проекты с кнопками Старт, Стоп, Рестарт и Down">
+        <p class="dk-title">Docker</p>
+        <div class="dk-tabs"><span class="dk-btn on">Контейнеры 20</span><span class="dk-btn">Образы 36</span><span class="dk-btn">Сети 14</span><span class="dk-btn">Тома 28</span><span class="dk-btn refresh">Обновить</span></div>
+        <div class="dk-list">
+          <div class="dk-row"><span>▸ codebabai<span class="dk-n">0/1</span></span><span class="dk-acts"><span class="dk-btn">Старт</span><span class="dk-btn">Down</span></span></div>
+          <div class="dk-row"><span>▸ landcraft-langfuse<span class="dk-n">0/6</span></span><span class="dk-acts"><span class="dk-btn">Старт</span><span class="dk-btn">Down</span></span></div>
+          <div class="dk-row"><span>▾ my_lovab<span class="dk-n up">2/2</span></span><span class="dk-acts"><span class="dk-btn">Стоп</span><span class="dk-btn">Рестарт</span><span class="dk-btn">Down</span></span></div>
+          <div class="dk-c"><span class="dot">●</span><b>landix_minio</b>minio/minio · Up 6 hours<a href="#docker-manager">:9100</a></div>
+          <div class="dk-sub"><span class="dk-btn">Стоп</span><span class="dk-btn">Рестарт</span><span class="dk-btn">Логи</span><span class="dk-btn">Копировать ID</span><span class="dk-btn">Удалить</span></div>
+          <div class="dk-c"><span class="dot">●</span><b>landix_postgres</b>postgres:18.2-alpine · Up 6 hours<a href="#docker-manager">:5432</a></div>
+          <div class="dk-row"><span>▸ Отдельные контейнеры<span class="dk-n up">1/1</span></span></div>
+        </div>
+      </div>
+      <figcaption>Панель Docker сбоку от чата в десктопе Claude Code.</figcaption>
     </figure>
   </article>
 
