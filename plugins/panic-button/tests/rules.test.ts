@@ -84,6 +84,9 @@ test('cleaning up Claude scratchpad passes quietly', () => {
     `D=${BASH_SCRATCH}; rm -rf "\${D}/build" 2>/dev/null`,
     'rm -rf /tmp/claude-501/proj/session/scratchpad/x',
     `rmdir /s /q "${SCRATCH}\\cmp"`,
+    // Short names after `cd` into the scratchpad, every step on the way joined by `&&`.
+    `cd "${BASH_SCRATCH}" && py -3.11 extract_lesson.py && rm -rf lesson_try.py __pycache__`,
+    `cd ${BASH_SCRATCH} && PYTHONIOENCODING=utf-8 py lesson.py | grep -v "urok-07\\|urok-10" && rm -rf out/*`,
   ]
 
   for (const command of cleanups) expect(bash(command)).toBeUndefined()
@@ -129,6 +132,23 @@ test('recursive deletion outside scratchpad still raises the alarm', () => {
     `$d = '${SCRATCH}\\cmp'; foreach ($d in 'C:\\Users') { Remove-Item -Recurse $d }`,
     `$d = '${SCRATCH}\\cmp'; Set-Variable d C:\\Users; Remove-Item -Recurse $d`,
     `$d = '${SCRATCH}\\cmp'; $d, $e = 'C:\\Users', 'x'; Remove-Item -Recurse $d`,
+    // Short names where the folder they are in is not sure to be the scratchpad.
+    `cd "${BASH_SCRATCH}" && py x.py; rm -rf __pycache__`,
+    `cd "${BASH_SCRATCH}"\nrm -rf __pycache__`,
+    `cd "${BASH_SCRATCH}" || exit 1; rm -rf build`,
+    `cd "${BASH_SCRATCH}" & rm -rf build`,
+    `cd "${BASH_SCRATCH}" && cd .. && rm -rf build`,
+    `cd "${BASH_SCRATCH}" && pushd /home && rm -rf build`,
+    `cd "${BASH_SCRATCH}" && source env.sh && rm -rf build`,
+    `cd "${BASH_SCRATCH}" && . ./env.sh && rm -rf build`,
+    `cd "${BASH_SCRATCH}" && rm -rf ../x`,
+    `cd "${BASH_SCRATCH}" && rm -rf ~/x`,
+    `cd "${BASH_SCRATCH}" && rm -rf /home`,
+    `cd "${BASH_SCRATCH}" && rm -rf .*`,
+    'cd /home/u && rm -rf build',
+    `echo hi && cd "${BASH_SCRATCH}" && rm -rf build`,
+    `rm -rf build && cd "${BASH_SCRATCH}"`,
+    `Set-Location '${SCRATCH}'; Remove-Item -Recurse build`,
     // A scratchpad-looking folder that does not start the path.
     `rm -rf ./x/Temp/claude/p/s/scratchpad/cmp`,
   ]

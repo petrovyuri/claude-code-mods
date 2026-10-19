@@ -293,7 +293,7 @@ footer { padding: 32px 16px 56px; line-height: 1.7; border-top: 1px solid var(--
 
   <article class="mod wide wrap" id="panic-button" data-mod="panic-button">
     <div>
-      <h2>panic-button <span class="ver">v0.0.5</span></h2>
+      <h2>panic-button <span class="ver">v0.0.6</span></h2>
       <p class="where">Вопрос в чате</p>
       <p class="say">Перед командой, которую не отменить, Claude останавливается и спрашивает вас. Haiku одной фразой объясняет, что именно сломается.</p>
       <ul>
@@ -302,6 +302,7 @@ footer { padding: 32px 16px 56px; line-height: 1.7; border-top: 1px solid var(--
         <li>Базы: <code>DROP TABLE</code>, <code>TRUNCATE</code>, <code>DELETE</code> без <code>WHERE</code>.</li>
         <li>Секреты: чтение и правка файлов <code>.env</code>.</li>
         <li>После «Запретить» Claude не повторяет команду, не ищет обходной путь и спрашивает, как быть.</li>
+        <li>«Объяснить»: Claude подробно расскажет, что сделает команда и зачем она нужна, и спросит снова.</li>
         <li>Всю команду видно в превью варианта, длинная цепочка ничего не спрячет.</li>
       </ul>
       <div class="get">
@@ -312,13 +313,14 @@ footer { padding: 32px 16px 56px; line-height: 1.7; border-top: 1px solid var(--
       </div>
     </div>
     <figure class="shot">
-      <div class="ask-dialog" role="img" aria-label="Вопрос panic-button в чате: опасное действие, команда и варианты Разрешить, Запретить, Другое">
+      <div class="ask-dialog" role="img" aria-label="Вопрос panic-button в чате: опасное действие, команда и варианты Разрешить, Запретить, Объяснить, Другое">
         <p class="ask-q"><span class="bang">❗</span>Опасное действие: удаление таблицы или базы данных.
 Команда только выводит текст "DROP TABLE demo" в консоль, таблица demo не удаляется.
 Команда: `echo "DROP TABLE demo"`
 Разрешить?</p>
         <div class="ask-opt"><span class="radio on"></span><span>Разрешить</span></div>
         <div class="ask-opt"><span class="radio"></span><span>Запретить</span><small>Claude не выполнит команду и спросит, как быть</small></div>
+        <div class="ask-opt"><span class="radio"></span><span>Объяснить</span><small>Claude подробно расскажет, что сделает команда и зачем она нужна, и спросит снова</small></div>
         <div class="ask-opt"><span class="radio"></span><span>Другое</span></div>
         <div class="ask-actions"><span class="ask-skip">Пропустить</span><span class="ask-send">Отправить <kbd>Ctrl</kbd><kbd>⏎</kbd></span></div>
       </div>

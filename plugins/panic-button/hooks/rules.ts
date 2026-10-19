@@ -27,12 +27,33 @@ const SCRATCHPAD = /^(?:[a-z]:)?[\\/](?:[^\\/]+[\\/])*?te?mp[\\/]claude[^\\/]*[\
 // where bash splits an unquoted `$d` into several targets.
 const PLAIN_PATH = /^[\p{L}\p{N}_.:\\/*?@+-]+$/u
 
-const inScratchpad = (path: string) =>
+// Plain, with no way up and no glob that could match `..`.
+const isPlain = (path: string) =>
   PLAIN_PATH.test(path) &&
   path.indexOf(':', 2) === -1 &&
-  SCRATCHPAD.test(path) &&
-  // No way up and no glob that could match `..`.
   !path.split(/[\\/]/).some(segment => segment.startsWith('..') || /^\.[^\\/]*[*?]/.test(segment))
+
+const inScratchpad = (path: string) => isPlain(path) && SCRATCHPAD.test(path)
+
+// A name below the current folder: not absolute, no drive, no `~`, not the folder itself.
+const isBelow = (path: string) => isPlain(path) && !/^([\\/~.-]|[a-z]:)/i.test(path) && path !== ''
+
+// Anything that moves the shell to another folder, or runs code in this shell that might.
+const MOVES =
+  /(^|[\s;&|({])(cd|chdir|pushd|popd|Set-Location|Push-Location|Pop-Location|sl|source|eval|exec|\.)(?=$|[\s;&|)}])/gi
+
+// The command starts with `cd` into the scratchpad, never moves again, and reaches `step` through `&&` alone:
+// if that `cd` fails, nothing after it runs, so a short name in `step` is sure to be in the scratchpad.
+// After `;`, `||`, `&` or a new line the rest would run in the folder Claude started in.
+const startsInScratchpad = (step: string, command: string) => {
+  const cd = /^cd\s+("[^"]*"|'[^']*'|[^\s;&|"'`]+)\s*&&/.exec(command)
+  if (cd === null || !inScratchpad((cd[1] ?? '').replace(/^(["'])(.*)\1$/, '$2'))) return false
+  if ([...command.matchAll(MOVES)].length !== 1) return false
+
+  const at = command.indexOf(step, cd[0].length)
+
+  return at !== -1 && !/[;&\n]|\|\|/.test(command.slice(cd[0].length, at).replace(/&&/g, ''))
+}
 
 // The one quoted or bare value a variable gets before the delete, or undefined when it gets none, several, or a computed one.
 // Case-sensitive on purpose: in bash `$d` is not `$D`, and a miss only keeps the alarm.
@@ -96,7 +117,7 @@ const cleansScratchpad = (step: string, command: string) => {
     targets.length > 0 &&
     targets.every(target => {
       const variable = /^\$(?:\{(\w+)\}|(\w+))(.*)$/.exec(target)
-      if (variable === null) return inScratchpad(target)
+      if (variable === null) return inScratchpad(target) || (isBelow(target) && startsInScratchpad(step, command))
 
       const [, braced, bare, rest = ''] = variable
       const value = valueOf(braced ?? bare ?? '', before, command)
