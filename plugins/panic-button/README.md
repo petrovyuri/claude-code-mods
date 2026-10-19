@@ -1,6 +1,6 @@
 # panic-button
 
-![версия](https://img.shields.io/badge/версия-0.0.2-c6613f) ![Claude Code](https://img.shields.io/badge/Claude_Code-мод-30302e)
+![версия](https://img.shields.io/badge/версия-0.0.3-c6613f) ![Claude Code](https://img.shields.io/badge/Claude_Code-мод-30302e)
 
 Тревожная кнопка. Перед командой, которую не отменить, Claude останавливается и спрашивает вас.
 
@@ -24,7 +24,7 @@
 
 | Группа | Команды |
 |---|---|
-| Файлы | `rm -rf`, `Remove-Item -Recurse`, `rmdir /s`, `del /s` |
+| Файлы | `rm -rf`, `Remove-Item -Recurse`, `rmdir /s`, `del /s` (уборку Claude в своей временной папке scratchpad не спрашивает) |
 | Git | `push --force`, `reset --hard`, `clean -f`, `branch -D` |
 | Базы данных | `DROP TABLE`, `DROP DATABASE`, `TRUNCATE`, `DELETE` без `WHERE` |
 | Секреты | Чтение и правка файлов `.env`, `.env.local`, `.env.production` (шаблоны `.env.example` и зашифрованный sops `.env.enc` можно) |

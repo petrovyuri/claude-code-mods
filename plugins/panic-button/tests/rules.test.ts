@@ -70,6 +70,47 @@ test('the danger points at the dangerous step of a chained command', () => {
   expect(bash('echo "drop table users" | psql')?.part).toBe('echo "drop table users"')
 })
 
+const SCRATCH =
+  'C:\\Users\\dev\\AppData\\Local\\Temp\\claude\\C--Users-dev-projects-app\\1363ff91-18f6-455b-bb75-60849ca10d28\\scratchpad'
+const BASH_SCRATCH = '/c/Users/dev/AppData/Local/Temp/claude/C--Users-dev-projects-app/1363ff91/scratchpad'
+
+test('cleaning up Claude scratchpad passes quietly', () => {
+  const cleanups = [
+    `$env:Path += ";$HOME\\scoop\\shims;$env:LOCALAPPDATA\\Microsoft\\WinGet\\Links"\n$d = '${SCRATCH}\\cmp'; if (Test-Path $d) { Remove-Item -Recurse -Force $d }\nNew-Item -ItemType Directory $d | Out-Null`,
+    `Remove-Item -Recurse -Force -ErrorAction SilentlyContinue '${SCRATCH}\\cmp'`,
+    `Remove-Item -Path "${SCRATCH}\\out\\*" -Recurse`,
+    `rm -rf ${BASH_SCRATCH}/cmp`,
+    `d="${BASH_SCRATCH}/cmp"; rm -rf "$d" && mkdir -p "$d"`,
+    `D=${BASH_SCRATCH}; rm -rf "\${D}/build" 2>/dev/null`,
+    'rm -rf /tmp/claude-501/proj/session/scratchpad/x',
+    `rmdir /s /q "${SCRATCH}\\cmp"`,
+  ]
+
+  for (const command of cleanups) expect(bash(command)).toBeUndefined()
+})
+
+test('recursive deletion outside scratchpad still raises the alarm', () => {
+  const dangerous = [
+    `rm -rf ${BASH_SCRATCH}/../../..`,
+    `rm -rf ${BASH_SCRATCH}/cmp src`,
+    `rm -rf ${BASH_SCRATCH}/cmp /`,
+    'rm -rf $(echo /)',
+    `rm -rf ${BASH_SCRATCH}/cmp && rm -rf src`,
+    `rm -rf ${BASH_SCRATCH}/cmp; git push --force`,
+    'rm -rf "$d"',
+    `d=${BASH_SCRATCH}; d=/c/Users/dev; rm -rf "$d"`,
+    '$d = Join-Path $HOME work; Remove-Item -Recurse $d',
+    `$d = '${SCRATCH}\\$name'; Remove-Item -Recurse $d`,
+    'rm -rf /tmp/build',
+    'rm -rf C:\\Users\\dev\\scratchpad',
+    'Remove-Item -Recurse -Force .',
+  ]
+
+  for (const command of dangerous) expect(bash(command)).toBeDefined()
+  expect(bash(`rm -rf ${BASH_SCRATCH}/cmp; git push --force`)?.why).toBe('перезапись истории на сервере (push --force)')
+  expect(bash(`rm -rf ${BASH_SCRATCH}/cmp && rm -rf src`)?.part).toBe('rm -rf src')
+})
+
 test('file tools touching .env raise the alarm, templates do not', () => {
   expect(findDanger('Read', { file_path: 'C:\\app\\.env' })).toEqual({
     what: 'Read C:\\app\\.env',
