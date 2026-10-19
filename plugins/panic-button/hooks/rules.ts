@@ -19,10 +19,11 @@ const deletesEverything = (command: string) =>
     .split(';')
     .some(statement => /\bDELETE\s+FROM\b/i.test(statement) && !/\bWHERE\b/i.test(statement))
 
-// `.env`, `.env.local`, `.env.production`, but not the templates kept in git.
-const ENV_NAME = /^\.env(\.(?!example$|sample$|template$|dist$)[\w-]+)?$/i
+// `.env`, `.env.local`, `.env.production`, but not the templates kept in git
+// nor `.env.enc`, which sops keeps encrypted.
+const ENV_NAME = /^\.env(\.(?!example$|sample$|template$|dist$|enc$)[\w-]+)?$/i
 const ENV_IN_COMMAND =
-  /(^|[\s"'`/\\=<>(])\.env(\.(?!example\b|sample\b|template\b|dist\b)[\w-]+)?(?=$|[\s"'`;|&)<>])/i
+  /(^|[\s"'`/\\=<>(])\.env(\.(?!example\b|sample\b|template\b|dist\b|enc\b)[\w-]+)?(?=$|[\s"'`;|&)<>])/i
 
 const COMMAND_RULES: readonly Rule[] = [
   // Files.

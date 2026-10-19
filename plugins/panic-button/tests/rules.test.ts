@@ -48,6 +48,8 @@ test('ordinary commands pass quietly', () => {
     'npm run lint -- --fix',
     'cp .env.example .env.example.bak',
     'cat .env.example',
+    'sops -d .env.enc > /dev/null',
+    "echo '- [Секреты через sops](secrets.md) — все проекты: .env.enc + модуль SopsEnv' >> MEMORY.md",
     'echo $ENVIRONMENT',
     'Remove-Item old.log',
   ]
@@ -79,6 +81,7 @@ test('file tools touching .env raise the alarm, templates do not', () => {
   )
   expect(findDanger('Write', { file_path: '.env', content: 'X=1' })).toBeDefined()
   expect(findDanger('Read', { file_path: '/app/.env.example' })).toBeUndefined()
+  expect(findDanger('Read', { file_path: '/app/.env.enc' })).toBeUndefined()
   expect(findDanger('Read', { file_path: '/app/env.ts' })).toBeUndefined()
   expect(findDanger('Glob', { pattern: '**/.env' })).toBeUndefined()
 })

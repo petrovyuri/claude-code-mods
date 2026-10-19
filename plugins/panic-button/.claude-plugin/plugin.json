@@ -1,6 +1,6 @@
 {
   "name": "panic-button",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Тревожная кнопка: перед опасной командой (rm -rf, git push --force, DROP TABLE, .env) Haiku коротко объясняет, что сломается, и спрашивает «Разрешить / Запретить»",
   "author": {
     "name": "Yuri Petrov",
