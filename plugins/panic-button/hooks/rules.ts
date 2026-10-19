@@ -18,16 +18,26 @@ type Rule = {
 
 const has = (pattern: RegExp) => (command: string) => pattern.test(command)
 
-// Claude's own scratchpad: `…\Temp\claude\<project>\<session>\scratchpad`, or `/tmp/claude-501/…/scratchpad`.
-const SCRATCHPAD = /[\\/]te?mp[\\/]claude[^\\/]*[\\/](?:[^\\/]+[\\/])*?scratchpad(?:[\\/]|$)/i
+// Claude's own scratchpad at the start of an absolute path: `C:\…\Temp\claude\<project>\<session>\scratchpad`,
+// `/c/…/Temp/claude/…/scratchpad` in Git Bash, or `/tmp/claude-501/…/scratchpad`.
+const SCRATCHPAD = /^(?:[a-z]:)?[\\/](?:[^\\/]+[\\/])*?te?mp[\\/]claude[^\\/]*[\\/](?:[^\\/]+[\\/])*?scratchpad(?:[\\/]|$)/i
 
-const inScratchpad = (path: string) => SCRATCHPAD.test(path) && !/(^|[\\/])\.\.([\\/]|$)/.test(path) && !path.includes('$')
+// Letters, digits and plain punctuation only: nothing the shell expands into other paths
+// (braces, commas, backticks, `~`, `$`, brackets) and no second path glued on.
+const PLAIN_PATH = /^[\p{L}\p{N}_ .:\\/*?@+-]+$/u
 
-// The one quoted or bare value a variable gets in the command, or undefined when it gets none, several, or a computed one.
+const inScratchpad = (path: string) =>
+  PLAIN_PATH.test(path) &&
+  path.indexOf(':', 2) === -1 &&
+  SCRATCHPAD.test(path) &&
+  // No way up and no glob that could match `..`.
+  !path.split(/[\\/]/).some(segment => segment.startsWith('..') || /^\.[^\\/]*[*?]/.test(segment))
+
+// The one quoted or bare value a variable gets before the delete, or undefined when it gets none, several, or a computed one.
 // Case-sensitive on purpose: in bash `$d` is not `$D`, and a miss only keeps the alarm.
-const valueOf = (name: string, command: string) => {
+const valueOf = (name: string, before: string) => {
   // The value is read in a lookahead, so a second assignment later on the line is still counted.
-  const assignments = [...command.matchAll(new RegExp(`(^|[\\s;&|({])\\$?${name}\\s*(\\+?)=(?!=)\\s*(?=([^\\n]*))`, 'g'))]
+  const assignments = [...before.matchAll(new RegExp(`(^|[\\s;&|({])\\$?${name}\\s*(\\+?)=(?!=)\\s*(?=([^\\n]*))`, 'g'))]
   const [only] = assignments
   if (assignments.length !== 1 || only === undefined || only[2] === '+') return undefined
 
@@ -36,27 +46,38 @@ const valueOf = (name: string, command: string) => {
   return literal?.[1] ?? literal?.[2] ?? literal?.[3]
 }
 
-// Flags and redirections between the delete command and what it deletes.
-const isFlag = (token: string) => /^-/.test(token) || /^\/[a-z]$/i.test(token) || /^[\d*&]?>/.test(token)
+// Flags and redirections between the delete command and what it deletes. A flag with a value glued on
+// (`-Path:C:\x`) is a target, and `/s`-style flags exist only for cmd's `rd` and `del`: in Git Bash `/c` is drive C.
+const isFlag = (token: string, verb: string) =>
+  /^--?([a-z][\w-]*)?$/i.test(token) ||
+  (/^(rd|rmdir|del)$/i.test(verb) && /^\/[a-z]$/i.test(token)) ||
+  /^[\d*&]?>/.test(token)
 
 // A recursive delete whose every target lies in the scratchpad: Claude cleaning up after itself.
 const cleansScratchpad = (step: string, command: string) => {
-  // Up to the brace or parenthesis that closes a PowerShell block, but `${name}` is a variable, not a brace.
-  const args = /(?:^|[\s{(])(?:rm|Remove-Item|rmdir|rd|del)\s+((?:\$\{\w+\}|[^{}()])*)/i.exec(step)?.[1] ?? ''
+  const found = /(^|[\s{(])(rm|Remove-Item|rmdir|rd|del)\s+(.*)$/is.exec(step)
+  if (found === null) return false
+
+  const [, , verb = '', args = ''] = found
+  // A lone `}` closes the PowerShell block the delete sits in, as in `if (…) { Remove-Item … $d }`.
+  const inBlock = step.slice(0, found.index + 1).includes('{')
   const tokens = (args.match(/"[^"]*"|'[^']*'|\S+/g) ?? []).map(token => token.replace(/^(["'])(.*)\1$/, '$2'))
 
   const targets = tokens.filter(
-    (token, at) => !isFlag(token) && !/^-(ErrorAction|ea)$/i.test(tokens[at - 1] ?? ''),
+    (token, at) =>
+      !isFlag(token, verb) && !/^-(ErrorAction|ea)$/i.test(tokens[at - 1] ?? '') && !(inBlock && token === '}'),
   )
+
+  const before = command.slice(0, Math.max(command.indexOf(step), 0))
 
   return (
     targets.length > 0 &&
     targets.every(target => {
-      const variable = /^\$\{?(\w+)\}?(.*)$/.exec(target)
+      const variable = /^\$(?:\{(\w+)\}|(\w+))(.*)$/.exec(target)
       if (variable === null) return inScratchpad(target)
 
-      const [, name = '', rest = ''] = variable
-      const value = valueOf(name, command)
+      const [, braced, bare, rest = ''] = variable
+      const value = valueOf(braced ?? bare ?? '', before)
 
       return value !== undefined && inScratchpad(value + rest)
     })

@@ -104,6 +104,22 @@ test('recursive deletion outside scratchpad still raises the alarm', () => {
     'rm -rf /tmp/build',
     'rm -rf C:\\Users\\dev\\scratchpad',
     'Remove-Item -Recurse -Force .',
+    // Shell expansions that turn one scratchpad path into others.
+    `rm -rf ${BASH_SCRATCH}/cmp{,/../../..}`,
+    `rm -rf ${BASH_SCRATCH}/cmp{~,}`,
+    `d=${BASH_SCRATCH}; rm -rf "$d"{,/..}`,
+    `rm -rf ${BASH_SCRATCH}/.*`,
+    `rm -rf ${BASH_SCRATCH}/\`echo ..\``,
+    // Extra targets hidden in one token or behind a flag.
+    `$d = '${SCRATCH}\\cmp'; Remove-Item -Recurse $d,C:\\Users\\dev`,
+    `Remove-Item -Recurse ${SCRATCH}\\cmp,C:\\Users\\dev`,
+    `Remove-Item -Recurse -Path:C:\\Users\\dev '${SCRATCH}\\cmp'`,
+    `rm -rf ${BASH_SCRATCH}/cmp /c`,
+    `rm -rf ${BASH_SCRATCH}/cmp }`,
+    // The variable gets its scratchpad value only after the delete.
+    `rm -rf "$d"; d=${BASH_SCRATCH}/cmp`,
+    // A scratchpad-looking folder that does not start the path.
+    `rm -rf ./x/Temp/claude/p/s/scratchpad/cmp`,
   ]
 
   for (const command of dangerous) expect(bash(command)).toBeDefined()

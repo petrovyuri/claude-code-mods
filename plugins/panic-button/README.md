@@ -1,6 +1,6 @@
 # panic-button
 
-![версия](https://img.shields.io/badge/версия-0.0.3-c6613f) ![Claude Code](https://img.shields.io/badge/Claude_Code-мод-30302e)
+![версия](https://img.shields.io/badge/версия-0.0.4-c6613f) ![Claude Code](https://img.shields.io/badge/Claude_Code-мод-30302e)
 
 Тревожная кнопка. Перед командой, которую не отменить, Claude останавливается и спрашивает вас.
 
