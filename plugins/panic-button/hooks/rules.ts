@@ -23,8 +23,9 @@ const has = (pattern: RegExp) => (command: string) => pattern.test(command)
 const SCRATCHPAD = /^(?:[a-z]:)?[\\/](?:[^\\/]+[\\/])*?te?mp[\\/]claude[^\\/]*[\\/](?:[^\\/]+[\\/])*?scratchpad(?:[\\/]|$)/i
 
 // Letters, digits and plain punctuation only: nothing the shell expands into other paths
-// (braces, commas, backticks, `~`, `$`, brackets) and no second path glued on.
-const PLAIN_PATH = /^[\p{L}\p{N}_ .:\\/*?@+-]+$/u
+// (braces, commas, backticks, `~`, `$`, brackets), no second path glued on, and no whitespace,
+// where bash splits an unquoted `$d` into several targets.
+const PLAIN_PATH = /^[\p{L}\p{N}_.:\\/*?@+-]+$/u
 
 const inScratchpad = (path: string) =>
   PLAIN_PATH.test(path) &&
@@ -35,13 +36,34 @@ const inScratchpad = (path: string) =>
 
 // The one quoted or bare value a variable gets before the delete, or undefined when it gets none, several, or a computed one.
 // Case-sensitive on purpose: in bash `$d` is not `$D`, and a miss only keeps the alarm.
-const valueOf = (name: string, before: string) => {
-  // The value is read in a lookahead, so a second assignment later on the line is still counted.
-  const assignments = [...before.matchAll(new RegExp(`(^|[\\s;&|({])\\$?${name}\\s*(\\+?)=(?!=)\\s*(?=([^\\n]*))`, 'g'))]
-  const [only] = assignments
-  if (assignments.length !== 1 || only === undefined || only[2] === '+') return undefined
+const valueOf = (name: string, before: string, command: string) => {
+  // A changed IFS splits even a path without spaces.
+  if (/\bIFS\b/.test(command)) return undefined
 
-  const literal = /^(?:'([^']*)'|"([^"]*)"|([^\s'"`;&|(){}]+))(?=\s*(?:$|[;&|)}]))/.exec(only[3] ?? '')
+  // The value is read in a lookahead, so a second assignment later on the line is still counted.
+  const assignments = [...before.matchAll(new RegExp(`(^|[\\s;&|({])(\\$?)${name}\\s*(\\+?)=(?!=)\\s*(?=([^\\n]*))`, 'g'))]
+  const [only] = assignments
+  if (assignments.length !== 1 || only === undefined || only[3] === '+') return undefined
+
+  // Besides `$d` and `${d}`, the bare name may appear only in the bash assignment `d=` itself.
+  // Any other mention is another way to set it: `for d in`, `read d`, `printf -v d`, `Set-Variable d`.
+  const bare = [...command.matchAll(new RegExp(`(?<!\\$\\{?)\\b${name}\\b`, 'g'))].length
+  if (bare !== (only[2] === '$' ? 0 : 1)) return undefined
+
+  // Every `$d` but the PowerShell assignment only reads the variable: no `foreach ($d in`,
+  // `$d, $e = …`, `$d++`, `$d[0] =` or `[ref]$d`.
+  const assignedAt = only.index + (only[1]?.length ?? 0)
+  const writes = [...command.matchAll(new RegExp(`\\$(?:\\{${name}\\}|${name}\\b)`, 'g'))].some(use => {
+    if (only[2] === '$' && use.index === assignedAt) return false
+
+    const left = command.slice(0, use.index).trimEnd()
+    const right = command.slice(use.index + use[0].length).trimStart()
+
+    return /[,\]]$/.test(left) || /^(,|[-+*/%.]?=(?!=)|\+\+|--|in\b|\[|\.)/i.test(right)
+  })
+  if (writes) return undefined
+
+  const literal = /^(?:'([^']*)'|"([^"]*)"|([^\s'"`;&|(){}]+))(?=\s*(?:$|[;&|)}]))/.exec(only[4] ?? '')
 
   return literal?.[1] ?? literal?.[2] ?? literal?.[3]
 }
@@ -77,7 +99,7 @@ const cleansScratchpad = (step: string, command: string) => {
       if (variable === null) return inScratchpad(target)
 
       const [, braced, bare, rest = ''] = variable
-      const value = valueOf(braced ?? bare ?? '', before)
+      const value = valueOf(braced ?? bare ?? '', before, command)
 
       return value !== undefined && inScratchpad(value + rest)
     })

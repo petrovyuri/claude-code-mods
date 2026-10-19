@@ -118,6 +118,17 @@ test('recursive deletion outside scratchpad still raises the alarm', () => {
     `rm -rf ${BASH_SCRATCH}/cmp }`,
     // The variable gets its scratchpad value only after the delete.
     `rm -rf "$d"; d=${BASH_SCRATCH}/cmp`,
+    // Word splitting of an unquoted variable in bash.
+    `d="${BASH_SCRATCH}/a /home/u"; rm -rf $d`,
+    `IFS=X; d=${BASH_SCRATCH}/aX/home; rm -rf $d`,
+    `rm -rf '${BASH_SCRATCH}/a b'`,
+    // The variable gets another value some other way than its one assignment.
+    `d=${BASH_SCRATCH}; for d in /home; do rm -rf "$d"; done`,
+    `d=${BASH_SCRATCH}/a; read d; rm -rf "$d"`,
+    `d=${BASH_SCRATCH}/a; printf -v d /home; rm -rf "$d"`,
+    `$d = '${SCRATCH}\\cmp'; foreach ($d in 'C:\\Users') { Remove-Item -Recurse $d }`,
+    `$d = '${SCRATCH}\\cmp'; Set-Variable d C:\\Users; Remove-Item -Recurse $d`,
+    `$d = '${SCRATCH}\\cmp'; $d, $e = 'C:\\Users', 'x'; Remove-Item -Recurse $d`,
     // A scratchpad-looking folder that does not start the path.
     `rm -rf ./x/Temp/claude/p/s/scratchpad/cmp`,
   ]
