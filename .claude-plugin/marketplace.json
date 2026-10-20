@@ -12,7 +12,7 @@
     {
       "name": "docker-manager",
       "source": "./plugins/docker-manager",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "description": "Панель Docker по образцу плагина VS Code: compose-проекты и контейнеры со стартом, остановкой, логами и удалением, образы, сети и тома"
     },
     {

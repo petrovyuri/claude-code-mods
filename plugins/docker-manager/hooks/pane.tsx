@@ -60,6 +60,25 @@ function stateColor(state: string): string {
 
 const groupKey = (key: string): string => (key === '' ? '_single' : key)
 
+const BAR_WIDTH = 10
+
+// How much of a bar the running containers fill: none when nothing runs, the whole bar when all do.
+export function barCells(running: number, total: number, width = BAR_WIDTH): number {
+  if (total <= 0 || running <= 0) return 0
+  if (running >= total) return width
+
+  // Partly running never reads as empty or full.
+  return Math.min(width - 1, Math.max(1, Math.round((running / total) * width)))
+}
+
+// The word beside the bar.
+export function runLabel(running: number, total: number): string {
+  if (running <= 0) return 'остановлен'
+  if (running >= total) return 'запущен'
+
+  return 'частично'
+}
+
 export function drawPane(el: El, view: View, act: Actions) {
   const { Box, Button, Code, Link, Text } = el
 
@@ -134,6 +153,24 @@ export function drawPane(el: El, view: View, act: Actions) {
     return draw(state.items)
   }
 
+  // A text bar: the running share in green, the rest dim, and the word for it.
+  const runBar = (key: string, running: number, total: number, width = BAR_WIDTH) => {
+    const filled = barCells(running, total, width)
+    const label = runLabel(running, total)
+
+    return (
+      <Box key={`bar:${key}`} gap={1} alignItems="center" flexShrink={0}>
+        <Text>
+          <Text color="success">{'█'.repeat(filled)}</Text>
+          <Text color="inactive">{'░'.repeat(width - filled)}</Text>
+        </Text>
+        <Text color={filled === 0 ? 'inactive' : filled === width ? 'success' : 'warning'}>
+          {label}
+        </Text>
+      </Box>
+    )
+  }
+
   const portLinks = (container: Container) =>
     container.ports
       .filter(port => port.url !== null)
@@ -184,6 +221,7 @@ export function drawPane(el: El, view: View, act: Actions) {
             plain
             onPress={() => act.select(isSelected ? null : container.id)}
           />
+          {runBar(`c:${container.id}`, isRunning(container) ? 1 : 0, 1, 5)}
           <Text dimColor wrap="truncate">
             {container.image}
           </Text>
@@ -219,6 +257,7 @@ export function drawPane(el: El, view: View, act: Actions) {
             <Text color={running.length > 0 ? 'success' : 'inactive'}>
               {running.length}/{group.containers.length}
             </Text>
+            {runBar(`g:${key}`, running.length, group.containers.length)}
           </Box>
           <Box gap={1} alignItems="center" flexWrap="wrap" justifyContent="flex-end">
           {isProject && stopped.length > 0 && (

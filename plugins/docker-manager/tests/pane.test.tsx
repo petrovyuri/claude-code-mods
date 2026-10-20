@@ -248,3 +248,39 @@ test('a newer result line is not cleared by the older timer', async ($, on) => {
   expect(await ui.find({ key: 'notice' })).toBeUndefined()
   await ui.unmount()
 })
+
+test('a group draws a bar: green while it runs, «остановлен» when nothing does', async ($, on) => {
+  const calls: string[][] = []
+  const allStopped = PS_OUT.replaceAll('	running	', '	exited	')
+  let stopped = false
+  on('process.run', dockerHost(calls, argv => (argv[1] === 'ps' && stopped ? run(0, allStopped) : null)))
+  const bar = async (key: string) => (await ui.find({ key: `bar:${key}` }))?.text
+
+  const ui = await $.ui.mount(DESKTOP)
+  await ui.press({ key: 'refresh' })
+
+  // shop runs one of two, the hand-run redis runs alone.
+  expect(await bar('g:shop')).toBe('█████░░░░░частично')
+  expect(await bar('g:_single')).toBe('██████████запущен')
+  // The filled cells are green, the rest dim, the word coloured by state.
+  expect(await ui.find({ key: 'bar:g:shop' })).toMatchObject({
+    children: [
+      { children: [{ props: { color: 'success' } }, { props: { color: 'inactive' } }] },
+      { props: { color: 'warning' } },
+    ],
+  })
+
+  await ui.press({ key: 'group:shop' })
+  expect(await bar('c:aaa111')).toBe('█████запущен')
+  expect(await bar('c:bbb222')).toBe('░░░░░остановлен')
+
+  // Everything stopped: no green cell is left, every group reads «остановлен».
+  stopped = true
+  await ui.press({ key: 'refresh' })
+  expect(await bar('g:shop')).toBe('░░░░░░░░░░остановлен')
+  expect(await bar('g:_single')).toBe('░░░░░░░░░░остановлен')
+  expect(await ui.find({ key: 'bar:g:shop' })).toMatchObject({
+    children: [{ children: [{ children: [''] }, { props: { color: 'inactive' } }] }, { props: { color: 'inactive' } }],
+  })
+  await ui.unmount()
+})

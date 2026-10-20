@@ -1,6 +1,6 @@
 # docker-manager
 
-![версия](https://img.shields.io/badge/версия-0.0.1-c6613f) ![Claude Code](https://img.shields.io/badge/Claude_Code-мод-30302e)
+![версия](https://img.shields.io/badge/версия-0.0.2-c6613f) ![Claude Code](https://img.shields.io/badge/Claude_Code-мод-30302e)
 
 Панель Docker внутри Claude Code, как у плагина Docker в VS Code. Контейнерами управляете вы сами, кнопками, без запросов к Claude.
 
