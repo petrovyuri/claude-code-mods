@@ -60,23 +60,54 @@ function stateColor(state: string): string {
 
 const groupKey = (key: string): string => (key === '' ? '_single' : key)
 
-const BAR_WIDTH = 10
+// The widest a bar grows: up to this many containers it draws a cell for each.
+const BAR_MAX = 20
+
+// A bar's cells: one a container, the running ones filled; a group past BAR_MAX keeps
+// BAR_MAX cells and fills its running share of them.
+export function barCells(running: number, total: number, max = BAR_MAX): { filled: number; width: number } {
+  if (total <= 0) return { filled: 0, width: 0 }
+  if (total <= max) return { filled: Math.min(Math.max(running, 0), total), width: total }
+
+  return { filled: shareCells(running, total, max), width: max }
+}
 
 // How much of a bar the running containers fill: none when nothing runs, the whole bar when all do.
-export function barCells(running: number, total: number, width = BAR_WIDTH): number {
-  if (total <= 0 || running <= 0) return 0
+function shareCells(running: number, total: number, width: number): number {
+  if (running <= 0) return 0
   if (running >= total) return width
 
   // Partly running never reads as empty or full.
   return Math.min(width - 1, Math.max(1, Math.round((running / total) * width)))
 }
 
-// The word beside the bar.
+// The word beside the bar: only a part-running group needs one; a full green bar or an empty
+// one, with its count, says it alone.
 export function runLabel(running: number, total: number): string {
-  if (running <= 0) return 'остановлен'
-  if (running >= total) return 'запущен'
+  if (running <= 0 || running >= total) return ''
 
   return 'частично'
+}
+
+// Each action's glyph and colour: go green, stop red, the rest by how far they reach.
+export const ICONS = {
+  start: { glyph: '▶', color: 'success' },
+  stop: { glyph: '■', color: 'error' },
+  restart: { glyph: '↻', color: 'suggestion' },
+  down: { glyph: '⏏', color: 'warning' },
+  remove: { glyph: '✕', color: 'error' },
+} as const
+
+export type Icon = (typeof ICONS)[keyof typeof ICONS]
+
+// What holds an image: Docker refuses to remove one while any container, running or stopped,
+// was made from it.
+export function usedBy(containers: number): string {
+  const last = containers % 10
+  const teen = containers % 100 >= 11 && containers % 100 <= 14
+  const word = teen || last === 0 || last >= 5 ? 'контейнеров' : last === 1 ? 'контейнер' : 'контейнера'
+
+  return `${containers} ${word} исп.`
 }
 
 export function drawPane(el: El, view: View, act: Actions) {
@@ -89,13 +120,16 @@ export function drawPane(el: El, view: View, act: Actions) {
   )
 
   // A destructive press asks again in place: the button gives way to "Да / Отмена".
-  const confirmable = (key: string, label: string, question: string, onConfirm: () => void) =>
+  // Given an icon, the button draws it and the label becomes its hover hint.
+  const confirmable = (key: string, label: string, question: string, onConfirm: () => void, icon?: Icon) =>
     view.confirm === key ? (
       <Box key={`ask:${key}`} gap={1} alignItems="center">
         <Text color="warning">{question}</Text>
         <Button key={`yes:${key}`} variant="primary" label="Да" onPress={onConfirm} />
         <Button key={`no:${key}`} label="Отмена" onPress={act.cancel} />
       </Box>
+    ) : icon !== undefined ? (
+      iconButton(key, icon, label, () => act.ask(key))
     ) : (
       <Button key={key} label={label} dimColor onPress={() => act.ask(key)} />
     )
@@ -154,8 +188,8 @@ export function drawPane(el: El, view: View, act: Actions) {
   }
 
   // A text bar: the running share in green, the rest dim, and the word for it.
-  const runBar = (key: string, running: number, total: number, width = BAR_WIDTH) => {
-    const filled = barCells(running, total, width)
+  const runBar = (key: string, running: number, total: number) => {
+    const { filled, width } = barCells(running, total)
     const label = runLabel(running, total)
 
     return (
@@ -164,12 +198,33 @@ export function drawPane(el: El, view: View, act: Actions) {
           <Text color="success">{'█'.repeat(filled)}</Text>
           <Text color="inactive">{'░'.repeat(width - filled)}</Text>
         </Text>
-        <Text color={filled === 0 ? 'inactive' : filled === width ? 'success' : 'warning'}>
-          {label}
-        </Text>
+        {label !== '' && <Text color="warning">{label}</Text>}
       </Box>
     )
   }
+
+  // An icon alone on the button; what it does shows while the pointer rests on it.
+  // The terminal colours the glyph; a desktop draws its own button in its own colour.
+  const iconButton = (key: string, icon: Icon, tip: string, onPress: () => void) => (
+    <Box key={`tip:${key}`}>
+      <Button key={key} onPress={onPress}>
+        <Text color={icon.color}>{icon.glyph}</Text>
+      </Button>
+      <Box
+        position="absolute"
+        top={-2}
+        right={0}
+        display="none"
+        hover={{ display: 'flex' }}
+        backgroundColor="text"
+        paddingX={1}
+      >
+        <Text color="inverseText" wrap="truncate">
+          {tip}
+        </Text>
+      </Box>
+    </Box>
+  )
 
   const portLinks = (container: Container) =>
     container.ports
@@ -221,7 +276,6 @@ export function drawPane(el: El, view: View, act: Actions) {
             plain
             onPress={() => act.select(isSelected ? null : container.id)}
           />
-          {runBar(`c:${container.id}`, isRunning(container) ? 1 : 0, 1, 5)}
           <Text dimColor wrap="truncate">
             {container.image}
           </Text>
@@ -245,9 +299,18 @@ export function drawPane(el: El, view: View, act: Actions) {
 
     return (
       <Box key={`g:${key}`} flexDirection="column" gap={1}>
-        {/* The name and count on the left, the project's actions on the right, as VS Code's row. */}
-        <Box gap={2} alignItems="center" justifyContent="space-between">
-          <Box gap={1} alignItems="center">
+        {/* The name and count on the left, the project's actions on the right, as VS Code's row.
+            The whole row lights under the pointer, so a button reads as its project's; the name
+            gives way when narrow, the buttons never wrap off their row. */}
+        <Box
+          key={`row:${key}`}
+          gap={2}
+          paddingX={1}
+          alignItems="center"
+          justifyContent="space-between"
+          hover={{ backgroundColor: 'subtle' }}
+        >
+          <Box gap={1} alignItems="center" flexShrink={1} minWidth={0} overflow="hidden">
             <Button
               key={`group:${key}`}
               label={`${isOpen ? '▾' : '▸'} ${group.title}`}
@@ -259,33 +322,30 @@ export function drawPane(el: El, view: View, act: Actions) {
             </Text>
             {runBar(`g:${key}`, running.length, group.containers.length)}
           </Box>
-          <Box gap={1} alignItems="center" flexWrap="wrap" justifyContent="flex-end">
-          {isProject && stopped.length > 0 && (
-            <Button
-              key={`gstart:${key}`}
-              label="Старт"
-              dimColor
-              onPress={() => act.run('start', stopped.map(c => c.id), group.title)}
-            />
-          )}
-          {isProject && running.length > 0 && (
-            <Button
-              key={`gstop:${key}`}
-              label="Стоп"
-              dimColor
-              onPress={() => act.run('stop', running.map(c => c.id), group.title)}
-            />
-          )}
-          {isProject && running.length > 0 && (
-            <Button
-              key={`grestart:${key}`}
-              label="Рестарт"
-              dimColor
-              onPress={() => act.run('restart', ids, group.title)}
-            />
-          )}
-          {isProject &&
-            confirmable(`down:${group.key}`, 'Down', `compose down ${group.title}?`, () => act.down(group.key))}
+          <Box gap={1} alignItems="center" flexShrink={0}>
+            {isProject &&
+              stopped.length > 0 &&
+              iconButton(`gstart:${key}`, ICONS.start, `Запустить ${group.title}`, () =>
+                act.run('start', stopped.map(c => c.id), group.title),
+              )}
+            {isProject &&
+              running.length > 0 &&
+              iconButton(`gstop:${key}`, ICONS.stop, `Остановить ${group.title}`, () =>
+                act.run('stop', running.map(c => c.id), group.title),
+              )}
+            {isProject &&
+              running.length > 0 &&
+              iconButton(`grestart:${key}`, ICONS.restart, `Перезапустить ${group.title}`, () =>
+                act.run('restart', ids, group.title),
+              )}
+            {isProject &&
+              confirmable(
+                `down:${group.key}`,
+                `Compose down ${group.title}: удалить контейнеры проекта`,
+                `compose down ${group.title}?`,
+                () => act.down(group.key),
+                ICONS.down,
+              )}
           </Box>
         </Box>
         {isOpen && group.containers.map(containerRow)}
@@ -324,14 +384,32 @@ export function drawPane(el: El, view: View, act: Actions) {
   ]
 
   // One line a row: what it is on the left, cut short when narrow; its button on the right.
+  // The whole row lights under the pointer, so its button reads as its own.
   const listRow = (key: string, info: RenderChildren[], action: RenderChildren) => (
-    <Box key={key} gap={2} alignItems="center" justifyContent="space-between">
+    <Box
+      key={key}
+      gap={2}
+      paddingX={1}
+      alignItems="center"
+      justifyContent="space-between"
+      hover={{ backgroundColor: 'subtle' }}
+    >
       <Box gap={1} alignItems="center" flexShrink={1} minWidth={0} overflow="hidden">
         {info}
       </Box>
       <Box flexShrink={0}>{action}</Box>
     </Box>
   )
+
+  // What a row is: its name on a line of its own, the details dim beneath it.
+  const nameOver = (name: RenderChildren, details: RenderChildren[]) => [
+    <Box flexDirection="column" minWidth={0}>
+      {name}
+      <Box gap={2} minWidth={0}>
+        {details}
+      </Box>
+    </Box>,
+  ]
 
   // The tab's bulk action above, the rows apart, so no button touches the next row's.
   const listCard = (key: string, tool: RenderChildren, rows: RenderChildren[]) =>
@@ -352,22 +430,30 @@ export function drawPane(el: El, view: View, act: Actions) {
         items.map(image =>
           listRow(
             `i:${image.id}:${image.repository}:${image.tag}`,
-            [
+            // What it weighs and who uses it beneath the name.
+            nameOver(
               <Text bold wrap="truncate">
                 {image.repository}
                 <Text dimColor>:{image.tag}</Text>
               </Text>,
-              <Text dimColor>{image.size}</Text>,
-              <Text dimColor wrap="truncate">
-                {image.created}
-              </Text>,
-              image.containers > 0 && <Text color="success">контейнеров: {image.containers}</Text>,
-            ],
+              [
+                <Text dimColor>{image.size}</Text>,
+                <Text dimColor wrap="truncate">
+                  {image.created}
+                </Text>,
+                image.containers > 0 && (
+                  <Text color="success" wrap="truncate">
+                    {usedBy(image.containers)}
+                  </Text>
+                ),
+              ],
+            ),
             confirmable(
               `rmi:${image.id}:${image.repository}:${image.tag}`,
-              'Удалить',
+              `Удалить образ ${image.repository}:${image.tag}`,
               `Удалить ${image.repository}:${image.tag}?`,
               () => act.removeImage(image),
+              ICONS.remove,
             ),
           ),
         ),
@@ -382,22 +468,28 @@ export function drawPane(el: El, view: View, act: Actions) {
         items.map(network =>
           listRow(
             `n:${network.id}`,
-            [
+            nameOver(
               <Text bold wrap="truncate">
                 {network.name}
               </Text>,
-              <Text dimColor>{network.driver}</Text>,
-              <Text dimColor>{network.scope}</Text>,
-              network.project !== null && (
-                <Text color="suggestion" wrap="truncate">
-                  {network.project}
-                </Text>
-              ),
-            ],
+              [
+                <Text dimColor>{network.driver}</Text>,
+                <Text dimColor>{network.scope}</Text>,
+                network.project !== null && (
+                  <Text color="suggestion" wrap="truncate">
+                    {network.project}
+                  </Text>
+                ),
+              ],
+            ),
             BUILT_IN_NETWORKS.has(network.name)
               ? null
-              : confirmable(`rmn:${network.id}`, 'Удалить', `Удалить сеть ${network.name}?`, () =>
-                  act.removeNetwork(network),
+              : confirmable(
+                  `rmn:${network.id}`,
+                  `Удалить сеть ${network.name}`,
+                  `Удалить сеть ${network.name}?`,
+                  () => act.removeNetwork(network),
+                  ICONS.remove,
                 ),
           ),
         ),
@@ -412,19 +504,25 @@ export function drawPane(el: El, view: View, act: Actions) {
         items.map(volume =>
           listRow(
             `v:${volume.name}`,
-            [
+            nameOver(
               <Text bold wrap="truncate">
                 {shortName(volume.name)}
               </Text>,
-              <Text dimColor>{volume.driver}</Text>,
-              volume.project !== null && (
-                <Text color="suggestion" wrap="truncate">
-                  {volume.project}
-                </Text>
-              ),
-            ],
-            confirmable(`rmv:${volume.name}`, 'Удалить', `Удалить том ${shortName(volume.name)} с данными?`, () =>
-              act.removeVolume(volume),
+              [
+                <Text dimColor>{volume.driver}</Text>,
+                volume.project !== null && (
+                  <Text color="suggestion" wrap="truncate">
+                    {volume.project}
+                  </Text>
+                ),
+              ],
+            ),
+            confirmable(
+              `rmv:${volume.name}`,
+              `Удалить том ${shortName(volume.name)}`,
+              `Удалить том ${shortName(volume.name)} с данными?`,
+              () => act.removeVolume(volume),
+              ICONS.remove,
             ),
           ),
         ),

@@ -1,6 +1,6 @@
 {
   "name": "docker-manager",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Панель Docker по образцу плагина VS Code: compose-проекты и контейнеры со стартом, остановкой, логами и удалением, образы, сети и тома",
   "author": {
     "name": "Yuri Petrov",

@@ -56,6 +56,8 @@ test('the containers tab groups compose projects and lists a project on expand',
   expect(await ui.find({ key: 'sel:aaa111' })).toBeUndefined()
 
   await ui.press({ key: 'group:shop' })
+  // The open project's arrow turns down.
+  expect(await ui.find({ key: 'group:shop' })).toMatchObject({ props: { label: '▾ shop' } })
   expect(await ui.find({ key: 'sel:aaa111' })).toMatchObject({ props: { label: 'db' } })
   expect(await ui.find({ key: 'sel:bbb222' })).toMatchObject({ props: { label: 'api' } })
   // The published port opens in a browser.
@@ -249,7 +251,165 @@ test('a newer result line is not cleared by the older timer', async ($, on) => {
   await ui.unmount()
 })
 
-test('a group draws a bar: green while it runs, «остановлен» when nothing does', async ($, on) => {
+test('a project’s buttons are coloured icons whose hint shows on hover', async ($, on) => {
+  const calls: string[][] = []
+  on('process.run', dockerHost(calls))
+
+  const ui = await $.ui.mount(DESKTOP)
+  await ui.press({ key: 'refresh' })
+
+  // shop runs one of two: start, stop, restart and down are all offered.
+  // Go is green, stop red: the glyph is a coloured Text inside the button. No label of words: a
+  // desktop draws a label in the glyph's place, so the words are the hover hint's alone.
+  for (const [key, icon, color, tip] of [
+    ['gstart:shop', '▶', 'success', 'Запустить shop'],
+    ['gstop:shop', '■', 'error', 'Остановить shop'],
+    ['grestart:shop', '↻', 'suggestion', 'Перезапустить shop'],
+    ['down:shop', '⏏', 'warning', 'Compose down shop: удалить контейнеры проекта'],
+  ]) {
+    const button = { props: { key }, children: [{ props: { color }, children: [icon] }] }
+    expect(await ui.find({ key })).toMatchObject(button)
+    // The engine names the button by its glyph, never by the hint's words.
+    expect(await ui.find({ key })).toMatchObject({ props: { label: icon } })
+    expect((await ui.find({ key }))?.props).not.toHaveProperty('dimColor')
+    // The hint is drawn hidden beside the button and revealed by hover; no frame round it.
+    expect((await ui.find({ key: `tip:${key}` }))?.props).not.toHaveProperty('borderStyle')
+    expect(await ui.find({ key: `tip:${key}` })).toMatchObject({
+      children: [
+        button,
+        { props: { display: 'none' }, hover: { display: 'flex' }, children: [{ children: [tip] }] },
+      ],
+    })
+  }
+
+  // The project's row lights as one under the pointer, and its buttons never wrap off it.
+  // `find` leaves `hover` off the node it lands on, so the row is read from its group.
+  const row = (await ui.find({ key: 'g:shop' }))?.children?.[0]
+  expect(row).toMatchObject({ props: { key: 'row:shop' }, hover: { backgroundColor: 'subtle' } })
+  expect(row).toMatchObject({ children: [{ props: { flexShrink: 1 } }, { props: { flexShrink: 0 } }] })
+  expect(JSON.stringify(row)).not.toContain('"flexWrap"')
+
+  // The icon still asks before compose down.
+  await ui.press({ key: 'down:shop' })
+  expect(calls.some(argv => argv[1] === 'compose')).toBe(false)
+  expect(await ui.find({ type: 'Text', text: 'compose down shop?' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('the terminal colours the glyph and draws no frame round the button too', async ($, on) => {
+  const calls: string[][] = []
+  on('process.run', dockerHost(calls))
+
+  const ui = await $.ui.mount(TERMINAL)
+  await ui.press({ key: 'refresh' })
+  expect(await ui.find({ key: 'gstop:shop' })).toMatchObject({ children: [{ props: { color: 'error' } }] })
+  expect((await ui.find({ key: 'tip:gstop:shop' }))?.props).not.toHaveProperty('borderStyle')
+  await ui.unmount()
+})
+
+test('an image row: the name, and beneath it the size, age and how many containers use it', async ($, on) => {
+  const calls: string[][] = []
+  on('process.run', dockerHost(calls))
+
+  const ui = await $.ui.mount(DESKTOP)
+  await ui.press({ key: 'tab:images' })
+
+  // postgres:16 is held by one container; the dangling image by none.
+  const rows = ((await ui.find({ key: 'images-list' }))?.children ?? []).slice(1)
+  expect(rows[0]).toMatchObject({
+    children: [
+      {
+        children: [
+          {
+            props: { flexDirection: 'column' },
+            children: [
+              { props: { bold: true }, children: ['postgres', { children: [':', '16'] }] },
+              {
+                children: [
+                  { children: ['420MB'] },
+                  { children: ['7 days ago'] },
+                  { props: { color: 'success' }, children: ['1 контейнер исп.'] },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {},
+    ],
+  })
+  expect(JSON.stringify(rows[1])).not.toContain('исп.')
+  expect(JSON.stringify(rows)).not.toContain('контейнеров:')
+  await ui.unmount()
+})
+
+test('networks and volumes: the name on its own line, the details beneath', async ($, on) => {
+  const calls: string[][] = []
+  on('process.run', dockerHost(calls))
+
+  const ui = await $.ui.mount(DESKTOP)
+  // A row's first child holds what it is; the box within it, the name over the details.
+  type Node = { children?: Node[] }
+  const info = async (list: string, index: number) => {
+    const rows = ((await ui.find({ key: list }))?.children ?? []).slice(1) as Node[]
+
+    return rows[index]?.children?.[0]?.children?.[0]
+  }
+
+  await ui.press({ key: 'tab:networks' })
+  expect(await info('networks-list', 1)).toMatchObject({
+    props: { flexDirection: 'column' },
+    children: [
+      { props: { bold: true }, children: ['shop_default'] },
+      { children: [{ children: ['bridge'] }, { children: ['local'] }, { props: { color: 'suggestion' }, children: ['shop'] }] },
+    ],
+  })
+
+  await ui.press({ key: 'tab:volumes' })
+  expect(await info('volumes-list', 0)).toMatchObject({
+    props: { flexDirection: 'column' },
+    children: [
+      { props: { bold: true }, children: ['shop_pgdata'] },
+      { children: [{ children: ['local'] }, { props: { color: 'suggestion' }, children: ['shop'] }] },
+    ],
+  })
+  await ui.unmount()
+})
+
+test('images, networks and volumes: a row lights whole, its delete is an icon naming it', async ($, on) => {
+  const calls: string[][] = []
+  on('process.run', dockerHost(calls))
+
+  const ui = await $.ui.mount(DESKTOP)
+  for (const [tab, list, key, tip] of [
+    ['images', 'images-list', 'rmi:f74600a1a463:postgres:16', 'Удалить образ postgres:16'],
+    ['networks', 'networks-list', 'rmn:f323d9436ffe', 'Удалить сеть'],
+    ['volumes', 'volumes-list', 'rmv:', 'Удалить том'],
+  ]) {
+    await ui.press({ key: `tab:${tab}` })
+    // `find` leaves `hover` off the node it lands on, so the rows are read from their list.
+    const rows = ((await ui.find({ key: list }))?.children ?? []).slice(1)
+    expect(rows.length).toBeGreaterThan(0)
+    for (const row of rows) expect(row).toMatchObject({ hover: { backgroundColor: 'subtle' } })
+
+    const text = JSON.stringify(rows)
+    expect(text).toContain(`{"type":"Text","props":{"color":"error"},"children":["✕"]}`)
+    expect(text).toContain(tip)
+    // The words stay in the hint: no Button carries them as its label.
+    expect(text).not.toContain(`"label":"${tip}`)
+    expect(text).toContain(key)
+    expect(text).not.toContain(`"label":"Удалить"`)
+  }
+
+  // The icon still asks first.
+  await ui.press({ key: 'tab:images' })
+  await ui.press({ key: 'rmi:f74600a1a463:postgres:16' })
+  expect(calls.some(argv => argv[1] === 'image' && argv[2] === 'rm')).toBe(false)
+  expect(await ui.find({ type: 'Text', text: 'Удалить postgres:16?' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('a group draws a bar: green while it runs, empty and wordless when nothing does', async ($, on) => {
   const calls: string[][] = []
   const allStopped = PS_OUT.replaceAll('	running	', '	exited	')
   let stopped = false
@@ -259,9 +419,10 @@ test('a group draws a bar: green while it runs, «остановлен» when no
   const ui = await $.ui.mount(DESKTOP)
   await ui.press({ key: 'refresh' })
 
-  // shop runs one of two, the hand-run redis runs alone.
-  expect(await bar('g:shop')).toBe('█████░░░░░частично')
-  expect(await bar('g:_single')).toBe('██████████запущен')
+  // A cell a container: shop runs one of two, the hand-run redis runs alone.
+  expect(await bar('g:shop')).toBe('█░частично')
+  // A fully running group: the green bar alone, no «запущен».
+  expect(await bar('g:_single')).toBe('█')
   // The filled cells are green, the rest dim, the word coloured by state.
   expect(await ui.find({ key: 'bar:g:shop' })).toMatchObject({
     children: [
@@ -270,17 +431,21 @@ test('a group draws a bar: green while it runs, «остановлен» when no
     ],
   })
 
+  // An open project's containers draw no bar and no word: the dot tells their state.
   await ui.press({ key: 'group:shop' })
-  expect(await bar('c:aaa111')).toBe('█████запущен')
-  expect(await bar('c:bbb222')).toBe('░░░░░остановлен')
+  expect(await ui.find({ key: 'sel:aaa111' })).toBeDefined()
+  expect(await ui.find({ key: 'bar:c:aaa111' })).toBeUndefined()
+  expect(await ui.find({ key: 'bar:c:bbb222' })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: 'запущен' })).toBeUndefined()
 
-  // Everything stopped: no green cell is left, every group reads «остановлен».
+  // Everything stopped: no green cell is left and no word: the empty bar and 0/2 say it.
   stopped = true
   await ui.press({ key: 'refresh' })
-  expect(await bar('g:shop')).toBe('░░░░░░░░░░остановлен')
-  expect(await bar('g:_single')).toBe('░░░░░░░░░░остановлен')
+  expect(await bar('g:shop')).toBe('░░')
+  expect(await bar('g:_single')).toBe('░')
+  expect(await ui.find({ type: 'Text', text: 'остановлен' })).toBeUndefined()
   expect(await ui.find({ key: 'bar:g:shop' })).toMatchObject({
-    children: [{ children: [{ children: [''] }, { props: { color: 'inactive' } }] }, { props: { color: 'inactive' } }],
+    children: [{ children: [{ children: [''] }, { props: { color: 'inactive' } }] }],
   })
   await ui.unmount()
 })
