@@ -137,18 +137,35 @@ const deletesEverything = (command: string) =>
 // nor `.env.enc`, which sops keeps encrypted.
 const ENV_NAME = /^\.env(\.(?!example$|sample$|template$|dist$|enc$)[\w-]+)?$/i
 const ENV_IN_COMMAND =
-  /(^|[\s"'`/\\=<>(])\.env(\.(?!example\b|sample\b|template\b|dist\b|enc\b)[\w-]+)?(?=$|[\s"'`;|&)<>*])/i
+  /(^|[\s"'`/\\=<>(@:])\.env(\.(?!example\b|sample\b|template\b|dist\b|enc\b)[\w-]+)?(?=$|[\s"'`;|&)<>*])/i
 
-// A step that only asks whether the file is there: `ls .env`, `test -f .env`, `Test-Path .env`.
-const CHECKS_EXISTENCE = /^(ls|dir|stat|test|\[\[?|Test-Path)(\s|$)/i
-// Throwing output away is fine; any other redirection may write into or read from the file.
-const DISCARDED_OUTPUT = /\d*>\s*(\/dev\/null|\$null|nul)\b|\d*>&\d/gi
+// Commands that print, search, load, copy, send or overwrite a file.
+const READS_FILE =
+  /(^|[\s(`$])(cat|type|more|less|head|tail|bat|nl|tac|gc|Get-Content|Select-String|sls|grep|egrep|fgrep|rg|ag|findstr|sed|awk|gawk|cut|strings|xxd|od|hexdump|base64|source|cp|copy|Copy-Item|mv|move|Move-Item|scp|rsync|tee|Set-Content|Add-Content|Out-File)(?=\s|$)/i
+// `git show`, `git diff` and the like print a file from history.
+const READS_FROM_GIT = /\bgit\s+(show|diff|cat-file|blame)\b/
+// Code that opens a file, in `python -c`, `node -e` or a heredoc line.
+const READS_IN_CODE =
+  /\b(open|readFile|readFileSync|ReadAllText|ReadAllLines|read_text|dotenv_values|file_get_contents|fopen)\s*\(/
+// `. .env` loads the file into the shell.
+const SOURCES = /^\.\s/
+// `< .env` feeds it in, `> .env` overwrites it, `@.env` uploads it with curl.
+const REDIRECTS = /(<|>>?|@)\s*["']?[^\s;|&<>"']*/g
 
-// Only checks that `.env` exists. A listing fed to `xargs` or `find -exec` may well end up read.
-const checksExistence = (step: string, command: string) =>
-  !/\bxargs\b|\s-exec(dir)?\b/.test(command) &&
-  CHECKS_EXISTENCE.test(step) &&
-  !/[<>]/.test(step.replace(DISCARDED_OUTPUT, ''))
+// The step does something with what is in `.env`: a mere mention, as in `ls .env`,
+// `"envFile": ".env"` or `--env-file .env`, is fine.
+const readsEnv = (step: string) =>
+  ENV_IN_COMMAND.test(step) &&
+  (READS_FILE.test(step) ||
+    READS_FROM_GIT.test(step) ||
+    READS_IN_CODE.test(step) ||
+    SOURCES.test(step) ||
+    (step.match(REDIRECTS) ?? []).some(target => ENV_IN_COMMAND.test(target.replace(/^(<|>>?|@)\s*/, ''))))
+
+// A listing fed to `xargs cat` or `find -exec cat` is read too.
+const touchesEnv = (command: string) =>
+  steps(command).some(readsEnv) ||
+  (ENV_IN_COMMAND.test(command) && steps(command).some(step => /\bxargs\b|\s-exec(dir)?\b/.test(step) && READS_FILE.test(step)))
 
 const COMMAND_RULES: readonly Rule[] = [
   // Files, except Claude cleaning up its own scratchpad.
@@ -172,8 +189,8 @@ const COMMAND_RULES: readonly Rule[] = [
   { test: has(/\bDROP\s+(TABLE|DATABASE|SCHEMA)\b/i), why: 'удаление таблицы или базы данных' },
   { test: has(/\bTRUNCATE\s+(TABLE\s+)?[\w."`[]/i), why: 'очистка всей таблицы' },
   { test: deletesEverything, why: 'DELETE без WHERE удалит все строки' },
-  // Secrets, except checking that the file is there.
-  { test: has(ENV_IN_COMMAND), why: 'доступ к секретам в .env', harmless: checksExistence },
+  // Secrets.
+  { test: touchesEnv, why: 'доступ к секретам в .env' },
 ]
 
 // Tools that read or write a file by path, and the field that names it.

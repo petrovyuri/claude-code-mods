@@ -293,14 +293,14 @@ footer { padding: 32px 16px 56px; line-height: 1.7; border-top: 1px solid var(--
 
   <article class="mod wide wrap" id="panic-button" data-mod="panic-button">
     <div>
-      <h2>panic-button <span class="ver">v0.0.7</span></h2>
+      <h2>panic-button <span class="ver">v0.0.8</span></h2>
       <p class="where">Вопрос в чате</p>
       <p class="say">Перед командой, которую не отменить, Claude останавливается и спрашивает вас. Haiku одной фразой объясняет, что именно сломается.</p>
       <ul>
         <li>Файлы: <code>rm -rf</code>, <code>Remove-Item -Recurse</code>, <code>rmdir /s</code>.</li>
         <li>Git: <code>push --force</code>, <code>reset --hard</code>, <code>clean -f</code>, <code>branch -D</code>.</li>
         <li>Базы: <code>DROP TABLE</code>, <code>TRUNCATE</code>, <code>DELETE</code> без <code>WHERE</code>.</li>
-        <li>Секреты: чтение и правка файлов <code>.env</code>.</li>
+        <li>Секреты: чтение, копирование и перезапись <code>.env</code>. Простое упоминание, например <code>ls .env</code>, не мешает.</li>
         <li>После «Запретить» Claude не повторяет команду, не ищет обходной путь и спрашивает, как быть.</li>
         <li>«Объяснить»: Claude подробно расскажет, что сделает команда и зачем она нужна, и спросит снова.</li>
         <li>Всю команду видно в превью варианта, длинная цепочка ничего не спрячет.</li>
