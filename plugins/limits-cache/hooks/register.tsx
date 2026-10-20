@@ -26,8 +26,9 @@ const isWorking = atom({ plugin: 'limits-cache', key: 'isWorking' } as const, fa
 // Claude Code writes the main conversation's cache for an hour on a subscription; its
 // subagents and SDK sessions write it for five minutes.
 const ttl = atom({ plugin: 'limits-cache', key: 'ttl' } as const, '1h' as Ttl)
-// Auto is on from the session's start; turning it off, or an idle hour, holds for the session.
-const isAuto = atom({ plugin: 'limits-cache', key: 'isAuto' } as const, true)
+// Auto is off at the session's start: every warmup counts against the limits, so it waits for
+// a press. Turning it off, or an idle hour, holds for the session.
+const isAuto = atom({ plugin: 'limits-cache', key: 'isAuto' } as const, false)
 const activeAt = atom({ plugin: 'limits-cache', key: 'activeAt' } as const, null as number | null)
 const isWarming = atom({ plugin: 'limits-cache', key: 'isWarming' } as const, false)
 const now = atom({ plugin: 'limits-cache', key: 'now' } as const, 0)
@@ -275,11 +276,6 @@ export const register: Register = on => {
     // Loaded mid-session, the mod has seen no answer yet: the transcript has.
     await readTranscript($, await findTranscript($))
     await readMeter($)
-    // Auto on by default counts its idle hour from the start, as a press would.
-    if ((await read($, isAuto)) && (await read($, activeAt)) === null) {
-      const at = await $.clock.now()
-      await update($, activeAt, () => at)
-    }
     await tick($)
     $.clock.every(TICK_MS, () => void tick($))
     // The summary is a network call: asked for off the start, which it must not hold up.

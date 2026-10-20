@@ -164,11 +164,11 @@ async function autoOn(ui: Pick<Mounted, 'find'>): Promise<boolean> {
   return (await ui.find({ key: 'auto' }))?.props.variant === 'primary'
 }
 
-// Auto is on from the start: a test that counts a cache down untouched turns it off first.
-async function turnAutoOff(ui: Pick<Mounted, 'find' | 'press'>): Promise<void> {
-  expect(await autoOn(ui)).toBe(true)
-  await ui.press({ key: 'auto' })
+// Auto is off at the start: a test that wants it warming turns it on first.
+async function turnAutoOn(ui: Pick<Mounted, 'find' | 'press'>): Promise<void> {
   expect(await autoOn(ui)).toBe(false)
+  await ui.press({ key: 'auto' })
+  expect(await autoOn(ui)).toBe(true)
 }
 
 for (const surface of SURFACES) {
@@ -205,7 +205,6 @@ for (const surface of SURFACES) {
     engine(on)
     await start($)
     const ui = await $.ui.mount({ ...BAND, surface })
-    await turnAutoOff(ui)
     expect((await ui.find({ key: 'cache-status' }))?.text).toBe('пусто, ответов ещё не было')
     expect(await ui.find({ key: 'cache-bar' })).toBeUndefined()
 
@@ -280,8 +279,8 @@ for (const surface of SURFACES) {
     expect((await ui.find({ key: 'close-button' }))?.props).toMatchObject({ label: '✕', plain: true, dimColor: true })
     expect(await ui.findAll({ type: 'Select' })).toEqual([])
     expect((await ui.find({ key: 'warm' }))?.props).toMatchObject({ label: '↻', plain: true })
-    // Auto is on from the start: the band's one primary button.
-    expect((await ui.find({ key: 'auto' }))?.props).toMatchObject({ label: 'Авто', variant: 'primary', dimColor: false })
+    // Auto is off at the start: grey, not the primary button.
+    expect((await ui.find({ key: 'auto' }))?.props).toMatchObject({ label: 'Авто', variant: 'secondary', dimColor: true })
     await ui.unmount()
   })
 }
@@ -330,8 +329,8 @@ test('the Auto button turns Auto on and off; under the hour-long TTL it warms th
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
   await answer($)
 
-  // Off, the button is grey through and through: dim, its label the theme's inactive grey.
-  await ui.press({ key: 'auto' })
+  // Off from the start, the button is grey through and through: dim, its label the theme's
+  // inactive grey.
   const offButton = await ui.find({ key: 'auto' })
   expect(offButton?.props).toMatchObject({ label: 'Авто', variant: 'secondary', dimColor: true })
   expect((offButton?.children[0] as Drawn | undefined)?.props).toMatchObject({ color: 'inactive', dimColor: true })
@@ -533,7 +532,6 @@ for (const surface of SURFACES) {
     const world = engine(on)
     await start($)
     const ui = await $.ui.mount({ ...BAND, surface })
-    await turnAutoOff(ui)
     await answer($)
     await clock.advance(2 * 60_000)
     expect((await ui.find({ key: 'cache-status' }))?.text).toBe('3м')
@@ -632,8 +630,7 @@ test('Авто warms the cache before it lapses and stops after an idle hour', L
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
   await answer($)
 
-  // Nothing to press: Auto is on from the start.
-  expect(await autoOn(ui)).toBe(true)
+  await turnAutoOn(ui)
   expect(world.toasts).toEqual([])
 
   const period = TTL_MS['5m'] - LEAD_MS['5m']
@@ -657,19 +654,38 @@ test('Авто warms the cache before it lapses and stops after an idle hour', L
   await ui.unmount()
 })
 
-test('Auto on by default counts its idle hour from the start of the session', LONG_CLOCK, async ($, on) => {
+test('Auto is off by default: the cache is left to lapse untouched', async ($, on) => {
   const clock = mock.clock(on, { now: START })
   mock.store(on, FIVE_MINUTES)
   const world = engine(on)
   await start($)
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
-  expect(await autoOn(ui)).toBe(true)
+  await answer($)
+  expect(await autoOn(ui)).toBe(false)
+
+  await clock.advance(TTL_MS['5m'] + 60_000)
+  expect(world.forks).toEqual([])
+  expect(world.toasts).toEqual([])
+  expect((await ui.find({ key: 'cache-status' }))?.text).toBe('остыл')
+  await ui.unmount()
+})
+
+test('Auto turned on counts its idle hour from the press', LONG_CLOCK, async ($, on) => {
+  const clock = mock.clock(on, { now: START })
+  mock.store(on, FIVE_MINUTES)
+  const world = engine(on)
+  await start($)
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  await turnAutoOn(ui)
 
   await clock.advance(60 * 60_000 - 1000)
   expect(await autoOn(ui)).toBe(true)
   await clock.advance(1000)
   expect(await autoOn(ui)).toBe(false)
-  expect(world.toasts).toEqual(['Авто-подогрев выключен: час без активности в сессии'])
+  expect(world.toasts).toEqual([
+    'Авто включён: начнёт греть кеш после следующего ответа Claude',
+    'Авто-подогрев выключен: час без активности в сессии',
+  ])
   expect(world.forks).toEqual([])
   await ui.unmount()
 })
@@ -680,6 +696,7 @@ test('a new answer resets the idle hour Auto counts', LONG_CLOCK, async ($, on) 
   engine(on)
   await start($)
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  await turnAutoOn(ui)
   await answer($)
 
   await clock.advance(50 * 60_000)
@@ -696,7 +713,6 @@ test('Авто turned on over a cold cache waits for the next answer', async ($,
   const world = engine(on)
   await start($)
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
-  await turnAutoOff(ui)
   await answer($)
   await clock.advance(TTL_MS['5m'] + 1000)
 
@@ -721,6 +737,7 @@ test('Авто turns itself off when a warmup is refused', async ($, on) => {
   await start($)
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
   await answer($)
+  await turnAutoOn(ui)
 
   await clock.advance(TTL_MS['5m'])
 
