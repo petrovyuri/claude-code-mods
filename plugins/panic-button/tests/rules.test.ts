@@ -29,6 +29,7 @@ test('dangerous shell commands raise the alarm', () => {
     'type .env.local',
     'Get-Content C:\\app\\.env.production',
     'source ./.env',
+    'cat .env*',
   ]
 
   for (const command of dangerous) expect(bash(command)).toBeDefined()
@@ -156,6 +157,29 @@ test('recursive deletion outside scratchpad still raises the alarm', () => {
   for (const command of dangerous) expect(bash(command)).toBeDefined()
   expect(bash(`rm -rf ${BASH_SCRATCH}/cmp; git push --force`)?.why).toBe('перезапись истории на сервере (push --force)')
   expect(bash(`rm -rf ${BASH_SCRATCH}/cmp && rm -rf src`)?.part).toBe('rm -rf src')
+})
+
+test('checking that .env exists is fine, reading or writing it is not', () => {
+  const checks = [
+    'ls .env',
+    'ls .env 2>/dev/null; ls ../../../.env 2>/dev/null',
+    'test -f .env',
+    '[ -f .env.local ]',
+    'Test-Path .env 2>$null',
+    'dir .env',
+  ]
+  for (const command of checks) expect(bash(command)).toBeUndefined()
+
+  const reads = [
+    'ls .env && cat .env',
+    '[ -f .env ] && source .env',
+    'ls > .env',
+    'ls .env* | xargs cat',
+    'find . -name .env -exec cat {} \\;',
+  ]
+  for (const command of reads) expect(bash(command)?.why).toBe('доступ к секретам в .env')
+
+  expect(bash('ls .env 2>/dev/null; cat ./.env')?.part).toBe('cat ./.env')
 })
 
 test('file tools touching .env raise the alarm, templates do not', () => {

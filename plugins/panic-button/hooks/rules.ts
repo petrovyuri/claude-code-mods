@@ -137,7 +137,18 @@ const deletesEverything = (command: string) =>
 // nor `.env.enc`, which sops keeps encrypted.
 const ENV_NAME = /^\.env(\.(?!example$|sample$|template$|dist$|enc$)[\w-]+)?$/i
 const ENV_IN_COMMAND =
-  /(^|[\s"'`/\\=<>(])\.env(\.(?!example\b|sample\b|template\b|dist\b|enc\b)[\w-]+)?(?=$|[\s"'`;|&)<>])/i
+  /(^|[\s"'`/\\=<>(])\.env(\.(?!example\b|sample\b|template\b|dist\b|enc\b)[\w-]+)?(?=$|[\s"'`;|&)<>*])/i
+
+// A step that only asks whether the file is there: `ls .env`, `test -f .env`, `Test-Path .env`.
+const CHECKS_EXISTENCE = /^(ls|dir|stat|test|\[\[?|Test-Path)(\s|$)/i
+// Throwing output away is fine; any other redirection may write into or read from the file.
+const DISCARDED_OUTPUT = /\d*>\s*(\/dev\/null|\$null|nul)\b|\d*>&\d/gi
+
+// Only checks that `.env` exists. A listing fed to `xargs` or `find -exec` may well end up read.
+const checksExistence = (step: string, command: string) =>
+  !/\bxargs\b|\s-exec(dir)?\b/.test(command) &&
+  CHECKS_EXISTENCE.test(step) &&
+  !/[<>]/.test(step.replace(DISCARDED_OUTPUT, ''))
 
 const COMMAND_RULES: readonly Rule[] = [
   // Files, except Claude cleaning up its own scratchpad.
@@ -161,8 +172,8 @@ const COMMAND_RULES: readonly Rule[] = [
   { test: has(/\bDROP\s+(TABLE|DATABASE|SCHEMA)\b/i), why: 'удаление таблицы или базы данных' },
   { test: has(/\bTRUNCATE\s+(TABLE\s+)?[\w."`[]/i), why: 'очистка всей таблицы' },
   { test: deletesEverything, why: 'DELETE без WHERE удалит все строки' },
-  // Secrets.
-  { test: has(ENV_IN_COMMAND), why: 'доступ к секретам в .env' },
+  // Secrets, except checking that the file is there.
+  { test: has(ENV_IN_COMMAND), why: 'доступ к секретам в .env', harmless: checksExistence },
 ]
 
 // Tools that read or write a file by path, and the field that names it.
