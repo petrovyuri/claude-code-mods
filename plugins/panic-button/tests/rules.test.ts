@@ -214,3 +214,58 @@ test('file tools touching .env raise the alarm, templates do not', () => {
   expect(findDanger('Read', { file_path: '/app/env.ts' })).toBeUndefined()
   expect(findDanger('Glob', { pattern: '**/.env' })).toBeUndefined()
 })
+
+test('writing or copying a .env inside Claude scratchpad passes quietly', () => {
+  const writes = [
+    // Compose files copied out of the project with an empty .env beside them, as `env_file` wants.
+    `S="${SCRATCH.replace(/\\/g, '/')}/compose"; mkdir -p "$S"; cp C:/Users/dev/projects/app/prod/docker-compose.yml C:/Users/dev/projects/app/prod/Caddyfile "$S/" && : > "$S/.env"`,
+    `: > ${BASH_SCRATCH}/compose/.env`,
+    `echo "API_KEY=test" >> "${BASH_SCRATCH}/.env.local"`,
+    `cp /dev/null ${BASH_SCRATCH}/.env`,
+    `d=${BASH_SCRATCH}/compose; cp "$d/.env.ci" "$d/.env" && mv -f "$d/.env.tmp" "$d/.env.local"`,
+    `cat > "${BASH_SCRATCH}/.env" <<'EOF'\nAPI_KEY=test\nEOF`,
+    `printf 'A=1\\n' | tee -a ${BASH_SCRATCH}/.env >/dev/null`,
+    `cd "${BASH_SCRATCH}" && mkdir -p cmp && : > .env`,
+    `$d = '${SCRATCH}\\compose'; Set-Content -Path "$d\\.env" -Value ''`,
+    `'' | Out-File '${SCRATCH}\\.env'`,
+    `Copy-Item -Path '${SCRATCH}\\a\\.env' -Destination '${SCRATCH}\\b\\.env' -Force`,
+  ]
+  for (const command of writes) expect(bash(command)).toBeUndefined()
+
+  expect(findDanger('Write', { file_path: `${SCRATCH}\\compose\\.env`, content: '' })).toBeUndefined()
+  expect(findDanger('Edit', { file_path: `${BASH_SCRATCH}/.env`, old_string: 'a', new_string: 'b' })).toBeUndefined()
+})
+
+test('a real .env stays guarded on its way into or out of the scratchpad', () => {
+  const dangerous = [
+    // A real .env copied in.
+    `S=${BASH_SCRATCH}/compose; cp prod/.env "$S/.env"`,
+    `cp .env ${BASH_SCRATCH}/.env`,
+    `cat .env > ${BASH_SCRATCH}/.env`,
+    `tee ${BASH_SCRATCH}/.env < .env`,
+    `echo "$(cat .env)" > ${BASH_SCRATCH}/.env`,
+    `: > ${BASH_SCRATCH}/.env && cat .env`,
+    `: > ${BASH_SCRATCH}/.env; ls .env* | xargs cat`,
+    // The scratchpad's own .env read back or copied out: a copy of the real one may sit there.
+    `cat ${BASH_SCRATCH}/.env`,
+    `sort < ${BASH_SCRATCH}/.env`,
+    `source ${BASH_SCRATCH}/.env`,
+    `. ${BASH_SCRATCH}/.env`,
+    `cp ${BASH_SCRATCH}/.env ./leak.txt`,
+    `cp ${BASH_SCRATCH}/.env /dev/stdout`,
+    `cat > ${BASH_SCRATCH}/out < ${BASH_SCRATCH}/.env`,
+    `python -c "print(open('${BASH_SCRATCH}/.env').read())"`,
+    // Not sure to be the scratchpad.
+    ': > "$S/.env"',
+    `S=${BASH_SCRATCH}; S=/home/u; : > "$S/.env"`,
+    `: > ${BASH_SCRATCH}/../../.env`,
+    ': > ./x/Temp/claude/p/s/scratchpad/.env',
+    `cd "${BASH_SCRATCH}"; : > .env`,
+    `cd "${BASH_SCRATCH}" && cd .. && : > .env`,
+  ]
+  for (const command of dangerous) expect(bash(command)?.why).toBe('доступ к секретам в .env')
+
+  expect(bash(`: > ${BASH_SCRATCH}/.env && cat .env`)?.part).toBe('cat .env')
+  expect(findDanger('Read', { file_path: `${SCRATCH}\\.env` })?.why).toBe('чтение секретов в .env')
+  expect(findDanger('Write', { file_path: `${SCRATCH}\\..\\.env`, content: '' })?.why).toBe('правка секретов в .env')
+})

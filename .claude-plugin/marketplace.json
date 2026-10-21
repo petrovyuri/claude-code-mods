@@ -30,7 +30,7 @@
     {
       "name": "panic-button",
       "source": "./plugins/panic-button",
-      "version": "0.0.8",
+      "version": "0.0.9",
       "description": "Тревожная кнопка: перед опасной командой (rm -rf, git push --force, DROP TABLE, .env) Haiku коротко объясняет, что сломается, и спрашивает «Разрешить / Запретить»"
     }
   ]

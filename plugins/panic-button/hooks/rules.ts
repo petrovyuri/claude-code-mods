@@ -96,6 +96,26 @@ const isFlag = (token: string, verb: string) =>
   (/^(rd|rmdir|del)$/i.test(verb) && /^\/[a-z]$/i.test(token)) ||
   /^[\d*&]?>/.test(token)
 
+// A target of the step in the scratchpad: a plain path there, a variable set to one before the step,
+// or a short name after the command's `cd` into it.
+const liesInScratchpad = (target: string, step: string, command: string) => {
+  const variable = /^\$(?:\{(\w+)\}|(\w+))(.*)$/.exec(target)
+  if (variable === null) return inScratchpad(target) || (isBelow(target) && startsInScratchpad(step, command))
+
+  const [, braced, bare, rest = ''] = variable
+  const value = valueOf(braced ?? bare ?? '', command.slice(0, Math.max(command.indexOf(step), 0)), command)
+
+  return value !== undefined && inScratchpad(value + rest)
+}
+
+// Shell words with their quotes taken off, a redirection's too: `>"$d/.env"` is `>$d/.env`.
+const wordsOf = (text: string) =>
+  (text.match(/"[^"]*"|'[^']*'|\S+/g) ?? []).map(word => word.replace(/^(\d*>>?|<<-?|<)?(["'])(.*)\2$/, '$1$3'))
+
+// What a file command acts on: its words but flags, redirections and the value of `-ErrorAction`.
+const targetsOf = (verb: string, words: readonly string[]) =>
+  words.filter((word, at) => !isFlag(word, verb) && !/^-(ErrorAction|ea)$/i.test(words[at - 1] ?? ''))
+
 // A recursive delete whose every target lies in the scratchpad: Claude cleaning up after itself.
 const cleansScratchpad = (step: string, command: string) => {
   const found = /(^|[\s{(])(rm|Remove-Item|rmdir|rd|del)\s+(.*)$/is.exec(step)
@@ -104,27 +124,9 @@ const cleansScratchpad = (step: string, command: string) => {
   const [, , verb = '', args = ''] = found
   // A lone `}` closes the PowerShell block the delete sits in, as in `if (…) { Remove-Item … $d }`.
   const inBlock = step.slice(0, found.index + 1).includes('{')
-  const tokens = (args.match(/"[^"]*"|'[^']*'|\S+/g) ?? []).map(token => token.replace(/^(["'])(.*)\1$/, '$2'))
+  const targets = targetsOf(verb, wordsOf(args)).filter(target => !(inBlock && target === '}'))
 
-  const targets = tokens.filter(
-    (token, at) =>
-      !isFlag(token, verb) && !/^-(ErrorAction|ea)$/i.test(tokens[at - 1] ?? '') && !(inBlock && token === '}'),
-  )
-
-  const before = command.slice(0, Math.max(command.indexOf(step), 0))
-
-  return (
-    targets.length > 0 &&
-    targets.every(target => {
-      const variable = /^\$(?:\{(\w+)\}|(\w+))(.*)$/.exec(target)
-      if (variable === null) return inScratchpad(target) || (isBelow(target) && startsInScratchpad(step, command))
-
-      const [, braced, bare, rest = ''] = variable
-      const value = valueOf(braced ?? bare ?? '', before, command)
-
-      return value !== undefined && inScratchpad(value + rest)
-    })
-  )
+  return targets.length > 0 && targets.every(target => liesInScratchpad(target, step, command))
 }
 
 // `DELETE FROM table` in a statement that has no WHERE wipes every row.
@@ -162,10 +164,50 @@ const readsEnv = (step: string) =>
     SOURCES.test(step) ||
     (step.match(REDIRECTS) ?? []).some(target => ENV_IN_COMMAND.test(target.replace(/^(<|>>?|@)\s*/, ''))))
 
+const touchesEnv = (command: string) => steps(command).some(readsEnv)
+
 // A listing fed to `xargs cat` or `find -exec cat` is read too.
-const touchesEnv = (command: string) =>
-  steps(command).some(readsEnv) ||
-  (ENV_IN_COMMAND.test(command) && steps(command).some(step => /\bxargs\b|\s-exec(dir)?\b/.test(step) && READS_FILE.test(step)))
+const listsEnvForReading = (command: string) =>
+  ENV_IN_COMMAND.test(command) && steps(command).some(step => /\bxargs\b|\s-exec(dir)?\b/.test(step) && READS_FILE.test(step))
+
+// Every file command of a step, to tell the ones that only write from the ones that read.
+const FILE_COMMANDS = new RegExp(READS_FILE.source, 'gi')
+// Commands that write only what comes to them, and commands that copy files.
+const WRITES = /^(tee|Set-Content|Add-Content|Out-File)$/i
+const COPIES = /^(cp|copy|Copy-Item|mv|move|Move-Item)$/i
+// Where an empty `.env` is copied from.
+const NOTHING = /^(\/dev\/null|NUL|\$null)$/i
+
+// `.env` right where the command's `cd` into the scratchpad put it.
+const isEnvHere = (path: string, step: string, command: string) =>
+  /^(\.[\\/])?\.env(\.[\w-]+)?$/i.test(path) && startsInScratchpad(step, command)
+
+// The step only fills a `.env` of Claude's own in the scratchpad: every `.env` it names lies there, none is read
+// (`<`, `@`, `source`, code, git), and its file commands write what comes to them (`> .env`, `tee`, `Set-Content`,
+// `cat` fed by a heredoc) or copy files within the scratchpad. Reading that `.env` back or copying it out still
+// raises the alarm: a copy of the real one may sit there.
+const fillsScratchpadEnv = (step: string, command: string) => {
+  if (READS_FROM_GIT.test(step) || READS_IN_CODE.test(step) || SOURCES.test(step)) return false
+
+  const words = wordsOf(step.replace(/(\d*>>?|<<-?|<)\s+/g, '$1'))
+  const [verb = '', ...args] = words
+  const here = (path: string) => liesInScratchpad(path, step, command) || isEnvHere(path, step, command)
+
+  const onlyWrites = (found: string) =>
+    WRITES.test(found) ||
+    (found.toLowerCase() === verb.toLowerCase() &&
+      (/^cat$/i.test(verb)
+        ? args.every(arg => /^(\d*>>?|<<)/.test(arg))
+        : COPIES.test(verb) && targetsOf(verb, args).every(arg => NOTHING.test(arg) || here(arg))))
+
+  const named = words.filter(word => ENV_IN_COMMAND.test(word))
+
+  return (
+    named.length > 0 &&
+    named.every(word => !/^(<(?!<)|@)/.test(word) && here(word.replace(/^(\d*>>?|<<-?)/, ''))) &&
+    [...step.matchAll(FILE_COMMANDS)].every(found => onlyWrites(found[2] ?? ''))
+  )
+}
 
 const COMMAND_RULES: readonly Rule[] = [
   // Files, except Claude cleaning up its own scratchpad.
@@ -189,8 +231,9 @@ const COMMAND_RULES: readonly Rule[] = [
   { test: has(/\bDROP\s+(TABLE|DATABASE|SCHEMA)\b/i), why: 'удаление таблицы или базы данных' },
   { test: has(/\bTRUNCATE\s+(TABLE\s+)?[\w."`[]/i), why: 'очистка всей таблицы' },
   { test: deletesEverything, why: 'DELETE без WHERE удалит все строки' },
-  // Secrets.
-  { test: touchesEnv, why: 'доступ к секретам в .env' },
+  // Secrets, except Claude filling a `.env` of its own in the scratchpad.
+  { test: touchesEnv, why: 'доступ к секретам в .env', harmless: fillsScratchpadEnv },
+  { test: listsEnvForReading, why: 'доступ к секретам в .env' },
 ]
 
 // Tools that read or write a file by path, and the field that names it.
@@ -236,6 +279,8 @@ export const findDanger = (tool: string, input: Readonly<Record<string, unknown>
   const path = field === undefined ? undefined : input[field]
   if (typeof path === 'string' && ENV_NAME.test(baseName(path))) {
     const verb = tool === 'Read' || tool === 'Grep' ? 'чтение' : 'правка'
+    // Claude writing a `.env` of its own in the scratchpad; reading one back still asks.
+    if (verb === 'правка' && inScratchpad(path)) return undefined
 
     const what = `${tool} ${path}`
 
