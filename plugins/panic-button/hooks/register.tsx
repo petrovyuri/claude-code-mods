@@ -8,10 +8,11 @@ export const ASK_HEADER = '🚨 Тревога'
 export const ALLOW = 'Разрешить'
 export const DENY = 'Запретить'
 export const EXPLAIN = 'Объяснить'
-// The summary and the command in the question.
-const SUMMARY_CHARS = 160
+// The summary and the command in the question: a command past the limit is not cut, it
+// moves under the options whole.
+const SUMMARY_CHARS = 400
 const COMMAND_CHARS = 300
-// The whole command under the options: long scripts are cut.
+// The whole command under the options, only for a command the question did not show: long scripts are cut.
 const SHOWN_CHARS = 2000
 // The cheap model that says in plain words what the command is about to do.
 export const SUMMARY_MODEL = 'haiku'
@@ -49,17 +50,32 @@ const SUMMARY_SYSTEM =
 
 const cut = (text: string, chars: number) => (text.length > chars ? `${text.slice(0, chars)}…` : text)
 
+// A cut at a word, so a sentence never ends in half a word.
+const cutWords = (text: string, chars: number) => {
+  if (text.length <= chars) return text
+  const head = text.slice(0, chars)
+
+  return `${head.slice(0, Math.max(head.lastIndexOf(' '), 1))}…`
+}
+
+const isLong = (danger: Danger) => danger.what.length > COMMAND_CHARS
+
+// The command line of a question: the command whole, or a pointer to the options when it is
+// long, so the command is drawn once.
+const commandLine = (danger: Danger) =>
+  isLong(danger) ? 'Команда длинная: она целиком под вариантами.' : `Команда: \`${danger.what}\``
+
 const sentence = (text: string) => (/[.!?…]$/.test(text) ? text : `${text}.`)
 
 // The whole alarm in the dialog, a line each: what kind of danger, what exactly in the
 // cheap model's words (when it answered), the command Claude wants to run, the question.
-// The command is cut here; all of it waits under the options. The dialog draws plain
-// text, so the backticks mark the command as code without rendering it as such.
+// A long command is not in the question: all of it waits under the options. The dialog draws
+// plain text, so the backticks mark the command as code without rendering it as such.
 export const askText = (danger: Danger, summary?: string) =>
   [
     `❗ Опасное действие: ${sentence(danger.why)}`,
-    ...(summary === undefined ? [] : [sentence(cut(summary, SUMMARY_CHARS))]),
-    `Команда: \`${cut(danger.what, COMMAND_CHARS)}\``,
+    ...(summary === undefined ? [] : [sentence(cutWords(summary, SUMMARY_CHARS))]),
+    commandLine(danger),
     'Разрешить?',
   ].join('\n')
 
@@ -67,7 +83,7 @@ export const askText = (danger: Danger, summary?: string) =>
 export const explainedText = (danger: Danger, explanation: string | undefined) =>
   [
     `❗ Опасное действие: ${sentence(danger.why)}`,
-    `Команда: \`${cut(danger.what, COMMAND_CHARS)}\``,
+    commandLine(danger),
     '',
     explanation === undefined
       ? 'Объяснение получить не удалось: модель не ответила.'
@@ -76,8 +92,10 @@ export const explainedText = (danger: Danger, explanation: string | undefined) =
     'Разрешить?',
   ].join('\n')
 
-// What a focused option previews: the whole command, so a chain hides nothing.
-export const previewText = (danger: Danger) => `Вся команда:\n\n${cut(danger.what, SHOWN_CHARS)}`
+// What a focused option previews: the whole command, so a chain hides nothing. Only when the
+// question did not show it; a command the question shows in full is not drawn a second time.
+export const previewText = (danger: Danger) =>
+  isLong(danger) ? `Вся команда:\n\n${cut(danger.what, SHOWN_CHARS)}` : undefined
 
 export const stopText = (danger: Danger) =>
   `Тревожная кнопка: пользователь остановил «${danger.what.slice(0, 120)}» (${danger.why}). ` +
@@ -106,9 +124,11 @@ export const withDetails = (questions: readonly unknown[], find: (question: stri
     return {
       ...question,
       options: question.options.map(option => {
-        if (option.label === ALLOW) return { ...option, preview }
-        if (option.label === DENY) return { ...option, description: DENY_NOTE, preview }
-        if (option.label === EXPLAIN) return { ...option, description: EXPLAIN_NOTE, preview }
+        const shown = preview === undefined ? {} : { preview }
+
+        if (option.label === ALLOW) return { ...option, ...shown }
+        if (option.label === DENY) return { ...option, description: DENY_NOTE, ...shown }
+        if (option.label === EXPLAIN) return { ...option, description: EXPLAIN_NOTE, ...shown }
 
         return option
       }),
@@ -122,7 +142,7 @@ async function summarize($: EngineInterface, danger: Danger): Promise<string | u
       model: SUMMARY_MODEL,
       system: SUMMARY_SYSTEM,
       prompt: `Причина тревоги: ${danger.why}\n\nКоманда:\n${cut(danger.what, SHOWN_CHARS)}`,
-      maxTokens: 120,
+      maxTokens: 200,
       effort: 'low',
       timeoutMs: SUMMARY_MS,
     })
