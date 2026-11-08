@@ -229,11 +229,38 @@ test('the dialog gets the details under its options, other dialogs stay as they 
   const [drawn, untouched] = withDetails([ours, theirs], q => (q === ours.question ? danger : undefined)) as Question[]
 
   expect(drawn?.options.map(option => option.label)).toEqual([ALLOW, DENY, EXPLAIN])
-  expect(drawn?.options.every(option => option.preview === previewText(danger))).toBe(true)
-  expect(drawn?.options[0]).toEqual({ label: ALLOW, preview: previewText(danger) })
+  // The command is in the question whole: no second copy under the options.
+  expect(drawn?.options.some(option => option.preview !== undefined)).toBe(false)
+  expect(drawn?.options[0]).toEqual({ label: ALLOW })
   expect(drawn?.options[1]?.description).toBe(DENY_NOTE)
   expect(drawn?.options[2]?.description).toBe(EXPLAIN_NOTE)
   expect(untouched).toBe(theirs)
+})
+
+test('a long command is drawn once: whole under the options, not in the question', () => {
+  const what = `cd /app && ${'echo x; '.repeat(80)}rm -rf tmp`
+  const danger = { what, part: 'rm -rf tmp', why: 'рекурсивное удаление файлов' }
+  const question = askText(danger)
+  const ours = { question, header: ASK_HEADER, options: [{ label: ALLOW }, { label: DENY }, { label: EXPLAIN }] }
+
+  const [drawn] = withDetails([ours], () => danger) as Question[]
+
+  expect(question).not.toContain('echo x')
+  expect(question).toContain('целиком под вариантами')
+  expect(explainedText(danger, 'Удалит tmp.')).not.toContain('echo x')
+  expect(drawn?.options.every(option => option.preview === previewText(danger))).toBe(true)
+  expect(previewText(danger)).toContain('rm -rf tmp')
+})
+
+test('a long summary is not cut in half a word', () => {
+  const danger = { what: 'rm -rf x', part: 'rm -rf x', why: 'рекурсивное удаление файлов' }
+  const summary = `Удалит временную папку внутри каталога. ${'Остальное лишь читает файлы. '.repeat(20)}`
+
+  const line = askText(danger, summary).split(String.fromCharCode(10))[1] ?? ''
+
+  expect(line.endsWith('…')).toBe(true)
+  expect(line.length).toBeLessThanOrEqual(402)
+  expect(/(файлы\.|читает|лишь|Остальное)…$/.test(line)).toBe(true)
 })
 
 test('the texts name the command and the reason', () => {
@@ -244,7 +271,7 @@ test('the texts name the command and the reason', () => {
     '❗ Опасное действие: рекурсивное удаление файлов.\nСотрёт папку build!\nКоманда: `cd src && rm -rf build`\nРазрешить?',
   )
   expect(askText({ ...danger, what: 'x'.repeat(1000) }).length).toBeLessThan(400)
-  expect(previewText(danger)).toContain('cd src && rm -rf build')
+  expect(previewText(danger)).toBeUndefined()
   expect(explainedText(danger, 'Удалит build.')).toBe(
     '❗ Опасное действие: рекурсивное удаление файлов.\nКоманда: `cd src && rm -rf build`\n\nУдалит build.\n\nРазрешить?',
   )
